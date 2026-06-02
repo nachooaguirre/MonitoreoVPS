@@ -1,0 +1,913 @@
+<Page x:Class="SuperPOS.Client.Views.Tesoreria.TesoreriaPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="Tesorería" Background="#141414">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="#1A1A1A" Padding="20,14" BorderThickness="0,0,0,1" BorderBrush="#2A2A2A">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="🏦" FontSize="24" Margin="0,0,12,0"/>
+                    <StackPanel>
+                        <TextBlock Text="Tesorería" FontSize="20" FontWeight="Bold" Foreground="#F0F0F0"/>
+                        <TextBlock Text="Cuentas, movimientos, cheques y gastos por caja" FontSize="11" Foreground="#607080"/>
+                    </StackPanel>
+                </StackPanel>
+                <Button Grid.Column="1" Content="+ Gasto Caja" Height="36" Padding="14,0" Margin="0,0,8,0"
+                        Click="BtnNuevoGasto_Click"/>
+                <Button Grid.Column="2" Content="+ Movimiento" Height="36" Padding="16,0"
+                        Background="#1A2A40" Foreground="#4090C0" BorderBrush="#2A3A5A" BorderThickness="1"
+                        Click="BtnNuevoMovimiento_Click"/>
+            </Grid>
+        </Border>
+
+        <!-- Saldos resumen -->
+        <Grid Grid.Row="1" Margin="16,12,16,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Border Background="#1A2A1A" CornerRadius="10" Padding="18,14">
+                <StackPanel>
+                    <TextBlock Text="💵  EFECTIVO EN CAJA" FontSize="11" FontWeight="Bold" Foreground="#406040"/>
+                    <TextBlock x:Name="TxtSaldoEfectivo" Text="$ 0,00" FontSize="26" FontWeight="Bold" Foreground="#40C060" Margin="0,6,0,0"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="2" Background="#1A2030" CornerRadius="10" Padding="18,14">
+                <StackPanel>
+                    <TextBlock Text="🏦  BANCOS" FontSize="11" FontWeight="Bold" Foreground="#405080"/>
+                    <TextBlock x:Name="TxtSaldoBancos" Text="$ 0,00" FontSize="26" FontWeight="Bold" Foreground="#4090D0" Margin="0,6,0,0"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="4" Background="#2A2020" CornerRadius="10" Padding="18,14">
+                <StackPanel>
+                    <TextBlock Text="📊  TOTAL GENERAL" FontSize="11" FontWeight="Bold" Foreground="#806040"/>
+                    <TextBlock x:Name="TxtSaldoTotal" Text="$ 0,00" FontSize="26" FontWeight="Bold" Foreground="#D0B050" Margin="0,6,0,0"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- Tabs -->
+        <TabControl Grid.Row="2" Margin="16,12,16,16" Background="#141414" BorderBrush="#2A2A2A">
+
+            <!-- Movimientos -->
+            <TabItem Header="📋  Movimientos">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <Border Background="#1E1E1E" Padding="12,8" Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Cuenta:" Foreground="#809090" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <ComboBox x:Name="CboFiltrosCuenta" Width="200" Height="30" SelectionChanged="FiltroMovimientosChanged"
+                                      Foreground="#F0F0F0" Background="#2A2A2A"/>
+                            <TextBlock Text="Desde:" Foreground="#809090" VerticalAlignment="Center" Margin="14,0,8,0"/>
+                            <DatePicker x:Name="DtpDesde" Width="120" Height="30" SelectedDateChanged="FiltroMovimientosChanged"/>
+                            <TextBlock Text="Hasta:" Foreground="#809090" VerticalAlignment="Center" Margin="8,0,8,0"/>
+                            <DatePicker x:Name="DtpHasta" Width="120" Height="30" SelectedDateChanged="FiltroMovimientosChanged"/>
+                            <Button Content="🔄" Height="30" Width="36" Margin="8,0,0,0" Click="BtnRefreshMov_Click"/>
+                        </StackPanel>
+                    </Border>
+                    <DataGrid x:Name="DgMovimientos" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
+                              Background="#141414" Foreground="#D0D8E0" FontSize="13"
+                              RowBackground="#1A1A1A" AlternatingRowBackground="#1E1E1E"
+                              HorizontalGridLinesBrush="#2A2A2A" BorderThickness="0" RowHeight="38">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="FECHA" Binding="{Binding fecha, StringFormat='dd/MM/yy HH:mm'}" Width="120"/>
+                            <DataGridTemplateColumn Header="TIPO" Width="110">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border CornerRadius="4" Padding="6,2" Margin="4" HorizontalAlignment="Left">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding tipo}" Value="0"><Setter Property="Background" Value="#0A2010"/></DataTrigger>
+                                                        <DataTrigger Binding="{Binding tipo}" Value="1"><Setter Property="Background" Value="#200A0A"/></DataTrigger>
+                                                        <DataTrigger Binding="{Binding tipo}" Value="2"><Setter Property="Background" Value="#0A1020"/></DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock FontSize="11" FontWeight="Bold">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding tipo}" Value="0"><Setter Property="Text" Value="INGRESO"/><Setter Property="Foreground" Value="#40C060"/></DataTrigger>
+                                                            <DataTrigger Binding="{Binding tipo}" Value="1"><Setter Property="Text" Value="EGRESO"/><Setter Property="Foreground" Value="#C04040"/></DataTrigger>
+                                                            <DataTrigger Binding="{Binding tipo}" Value="2"><Setter Property="Text" Value="TRANSFER."/><Setter Property="Foreground" Value="#4080C0"/></DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="CONCEPTO" Binding="{Binding concepto}" Width="*"/>
+                            <DataGridTextColumn Header="CUENTA" Binding="{Binding cuentaNombre}" Width="160"/>
+                            <DataGridTextColumn Header="BENEFICIARIO" Binding="{Binding beneficiario}" Width="130"/>
+                            <DataGridTextColumn Header="NRO. DOC." Binding="{Binding nroDocumento}" Width="100"/>
+                            <DataGridTextColumn Header="MONTO" Binding="{Binding monto, StringFormat='$ #,##0.00'}" Width="110">
+                                <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="FontWeight" Value="Bold"/><Setter Property="HorizontalAlignment" Value="Right"/><Setter Property="Padding" Value="0,0,10,0"/></Style></DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <!-- Cheques -->
+            <TabItem Header="📄  Cheques">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Border Background="#1E1E1E" Padding="12,8" Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Tipo:" Foreground="#809090" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <ComboBox x:Name="CboTipoCheque" Width="130" Height="30" SelectionChanged="FiltroChequeChanged"
+                                      Foreground="#F0F0F0" Background="#2A2A2A">
+                                <ComboBoxItem Content="Todos" IsSelected="True"/>
+                                <ComboBoxItem Content="Recibidos"/>
+                                <ComboBoxItem Content="Emitidos"/>
+                            </ComboBox>
+                            <TextBlock Text="Estado:" Foreground="#809090" VerticalAlignment="Center" Margin="14,0,8,0"/>
+                            <ComboBox x:Name="CboEstadoCheque" Width="120" Height="30" SelectionChanged="FiltroChequeChanged"
+                                      Foreground="#F0F0F0" Background="#2A2A2A">
+                                <ComboBoxItem Content="Todos" IsSelected="True"/>
+                                <ComboBoxItem Content="Cartera"/>
+                                <ComboBoxItem Content="Depositados"/>
+                                <ComboBoxItem Content="Rechazados"/>
+                            </ComboBox>
+                            <Button Content="+ Registrar Cheque" Height="30" Padding="12,0" Margin="14,0,0,0"
+                                    Click="BtnNuevoCheque_Click"/>
+                        </StackPanel>
+                    </Border>
+                    <DataGrid x:Name="DgCheques" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
+                              Background="#141414" Foreground="#D0D8E0" FontSize="13"
+                              RowBackground="#1A1A1A" AlternatingRowBackground="#1E1E1E"
+                              HorizontalGridLinesBrush="#2A2A2A" BorderThickness="0" RowHeight="38"
+                              MouseDoubleClick="DgCheques_MouseDoubleClick">
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="TIPO" Width="90">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border CornerRadius="4" Padding="6,2" Margin="4" HorizontalAlignment="Left">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding tipo}" Value="0"><Setter Property="Background" Value="#0A2010"/></DataTrigger>
+                                                        <DataTrigger Binding="{Binding tipo}" Value="1"><Setter Property="Background" Value="#200A10"/></DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock FontSize="11" FontWeight="Bold">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding tipo}" Value="0"><Setter Property="Text" Value="RECIBIDO"/><Setter Property="Foreground" Value="#40C060"/></DataTrigger>
+                                                            <DataTrigger Binding="{Binding tipo}" Value="1"><Setter Property="Text" Value="EMITIDO"/><Setter Property="Foreground" Value="#C06080"/></DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="N° CHEQUE" Binding="{Binding nroCheque}" Width="110">
+                                <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="Foreground" Value="#60A0C0"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="VerticalAlignment" Value="Center"/><Setter Property="Padding" Value="8,0"/></Style></DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="BANCO" Binding="{Binding banco}" Width="130"/>
+                            <DataGridTextColumn Header="LIBRADOR" Binding="{Binding librador}" Width="150"/>
+                            <DataGridTextColumn Header="F. EMISIÓN" Binding="{Binding fechaEmision, StringFormat='dd/MM/yyyy'}" Width="100"/>
+                            <DataGridTextColumn Header="F. PAGO" Binding="{Binding fechaPago, StringFormat='dd/MM/yyyy'}" Width="100">
+                                <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="FontWeight" Value="Bold"/></Style></DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="MONTO" Binding="{Binding monto, StringFormat='$ #,##0.00'}" Width="110">
+                                <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="FontWeight" Value="Bold"/><Setter Property="HorizontalAlignment" Value="Right"/><Setter Property="Padding" Value="0,0,10,0"/></Style></DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTemplateColumn Header="ESTADO" Width="100">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock FontSize="11" FontWeight="Bold" VerticalAlignment="Center" Padding="8,0">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding estado}" Value="0"><Setter Property="Text" Value="CARTERA"/><Setter Property="Foreground" Value="#C0A020"/></DataTrigger>
+                                                        <DataTrigger Binding="{Binding estado}" Value="1"><Setter Property="Text" Value="DEPOSIT."/><Setter Property="Foreground" Value="#4090D0"/></DataTrigger>
+                                                        <DataTrigger Binding="{Binding estado}" Value="4"><Setter Property="Text" Value="RECHAZADO"/><Setter Property="Foreground" Value="#C04040"/></DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <Border Grid.Row="2" Background="#1A1A1A" Padding="12,8" Margin="0,8,0,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Doble clic en un cheque para cambiar estado (depositar, rechazar)" FontSize="11" Foreground="#506070"/>
+                            <TextBlock x:Name="TxtTotalCheques" FontSize="12" FontWeight="Bold" Foreground="#60A0C0" Margin="20,0,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- Gastos por caja -->
+            <TabItem Header="💸  Gastos por Caja">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <Border Background="#1E1E1E" Padding="12,8" Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Período:" Foreground="#809090" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <DatePicker x:Name="DtpGastoDesde" Width="120" Height="30" SelectedDateChanged="FiltroGastosChanged"/>
+                            <TextBlock Text="al" Foreground="#809090" VerticalAlignment="Center" Margin="8,0,8,0"/>
+                            <DatePicker x:Name="DtpGastoHasta" Width="120" Height="30" SelectedDateChanged="FiltroGastosChanged"/>
+                            <Button Content="+ Registrar Gasto" Height="30" Padding="12,0" Margin="14,0,0,0"
+                                    Click="BtnNuevoGasto_Click"/>
+                        </StackPanel>
+                    </Border>
+                    <DataGrid x:Name="DgGastos" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
+                              Background="#141414" Foreground="#D0D8E0" FontSize="13"
+                              RowBackground="#1A1A1A" AlternatingRowBackground="#1E1E1E"
+                              HorizontalGridLinesBrush="#2A2A2A" BorderThickness="0" RowHeight="38">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="FECHA" Binding="{Binding Fecha, StringFormat='dd/MM/yyyy HH:mm'}" Width="130"/>
+                            <DataGridTemplateColumn Header="CATEGORÍA" Width="130">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock FontSize="11" FontWeight="Bold" VerticalAlignment="Center" Padding="8,0" Foreground="#80A0C0">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Categoria}" Value="0"><Setter Property="Text" Value="🧹 Limpieza"/></DataTrigger>
+                                                        <DataTrigger Binding="{Binding Categoria}" Value="1"><Setter Property="Text" Value="📦 Insumos"/></DataTrigger>
+                                                        <DataTrigger Binding="{Binding Categoria}" Value="2"><Setter Property="Text" Value="💡 Servicios"/></DataTrigger>
+                                                        <DataTrigger Binding="{Binding Categoria}" Value="3"><Setter Property="Text" Value="🔧 Mantenimiento"/></DataTrigger>
+                                                        <DataTrigger Binding="{Binding Categoria}" Value="4"><Setter Property="Text" Value="👷 Personal"/></DataTrigger>
+                                                        <DataTrigger Binding="{Binding Categoria}" Value="5"><Setter Property="Text" Value="🚚 Logística"/></DataTrigger>
+                                                        <DataTrigger Binding="{Binding Categoria}" Value="9"><Setter Property="Text" Value="📋 Varios"/></DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="DESCRIPCIÓN" Binding="{Binding Descripcion}" Width="*"/>
+                            <DataGridTextColumn Header="N° COMPROBANTE" Binding="{Binding NroComprobante}" Width="130"/>
+                            <DataGridTextColumn Header="MONTO" Binding="{Binding Monto, StringFormat='$ #,##0.00'}" Width="110">
+                                <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="Foreground" Value="#C06060"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="HorizontalAlignment" Value="Right"/><Setter Property="Padding" Value="0,0,10,0"/></Style></DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <!-- Cuentas -->
+            <TabItem Header="🏛  Cuentas">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <Border Background="#1E1E1E" Padding="12,8" Margin="0,0,0,8">
+                        <Button Content="+ Nueva Cuenta" Height="30" Padding="12,0" HorizontalAlignment="Left"
+                                Click="BtnNuevaCuenta_Click"/>
+                    </Border>
+                    <DataGrid x:Name="DgCuentas" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
+                              Background="#141414" Foreground="#D0D8E0" FontSize="13"
+                              RowBackground="#1A1A1A" AlternatingRowBackground="#1E1E1E"
+                              HorizontalGridLinesBrush="#2A2A2A" BorderThickness="0" RowHeight="44">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="NOMBRE" Binding="{Binding nombre}" Width="*">
+                                <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="VerticalAlignment" Value="Center"/><Setter Property="Padding" Value="8,0"/></Style></DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="BANCO" Binding="{Binding banco}" Width="130"/>
+                            <DataGridTextColumn Header="N° CUENTA" Binding="{Binding nroCuenta}" Width="130"/>
+                            <DataGridTemplateColumn Header="TIPO" Width="180">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock VerticalAlignment="Center" Padding="8,0" Foreground="#8090A0" FontSize="12">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding tipo}" Value="0"><Setter Property="Text" Value="💵 Caja Efectivo"/></DataTrigger>
+                                                        <DataTrigger Binding="{Binding tipo}" Value="1"><Setter Property="Text" Value="🏦 Cta. Cte. Bancaria"/></DataTrigger>
+                                                        <DataTrigger Binding="{Binding tipo}" Value="2"><Setter Property="Text" Value="🏦 Caja de Ahorro"/></DataTrigger>
+                                                        <DataTrigger Binding="{Binding tipo}" Value="3"><Setter Property="Text" Value="💳 Tarjeta Crédito"/></DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="SALDO" Binding="{Binding saldoActual, StringFormat='$ #,##0.00'}" Width="130">
+                                <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="FontSize" Value="16"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="Foreground" Value="#60D090"/><Setter Property="HorizontalAlignment" Value="Right"/><Setter Property="VerticalAlignment" Value="Center"/><Setter Property="Padding" Value="0,0,12,0"/></Style></DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <!-- Conciliación Bancaria -->
+            <TabItem Header="📊  Conciliación">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Filtros y Extracto -->
+                    <Border Background="#1E1E1E" Padding="12,8" Margin="0,0,0,8">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <StackPanel Orientation="Horizontal" Grid.Column="0" VerticalAlignment="Center">
+                                <TextBlock Text="Banco:" Foreground="#809090" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <ComboBox x:Name="CboConciliaCuenta" Width="200" Height="30" Foreground="#F0F0F0" Background="#2A2A2A"/>
+                                
+                                <TextBlock Text="Desde:" Foreground="#809090" VerticalAlignment="Center" Margin="14,0,8,0"/>
+                                <DatePicker x:Name="DtpConciliaDesde" Width="120" Height="30"/>
+                                
+                                <TextBlock Text="Hasta:" Foreground="#809090" VerticalAlignment="Center" Margin="8,0,8,0"/>
+                                <DatePicker x:Name="DtpConciliaHasta" Width="120" Height="30"/>
+                                
+                                <Button Content="Cargar" Height="30" Width="70" Margin="14,0,0,0" Click="BtnConciliaCargar_Click"/>
+                            </StackPanel>
+                            
+                            <StackPanel Orientation="Horizontal" Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Saldo Extracto:" Foreground="#809090" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBox x:Name="TxtConciliaExtracto" Width="120" Height="30" 
+                                         Foreground="#F0F0F0" Background="#2A2A2A" 
+                                         BorderBrush="#444" BorderThickness="1"
+                                         Padding="6,4" Text="0.00" TextChanged="TxtConciliaExtracto_TextChanged"/>
+                                <Button Content="✓ Guardar Conciliación" Height="30" Padding="12,0" Margin="14,0,0,0"
+                                        Background="#1A3A2A" Foreground="#64C880" BorderBrush="#2A5A3A" BorderThickness="1"
+                                        Click="BtnConciliaGuardar_Click"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Grilla de Movimientos para Conciliar -->
+                    <DataGrid x:Name="DgConciliacion" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
+                              Background="#141414" Foreground="#D0D8E0" FontSize="13"
+                              RowBackground="#1A1A1A" AlternatingRowBackground="#1E1E1E"
+                              HorizontalGridLinesBrush="#2A2A2A" BorderThickness="0" RowHeight="38">
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="CONCIL." Width="80">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <CheckBox IsChecked="{Binding Conciliado, UpdateSourceTrigger=PropertyChanged}" 
+                                                  HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                  Click="ChkConciliado_Click"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="FECHA" Binding="{Binding Fecha, StringFormat='dd/MM/yy HH:mm'}" Width="120"/>
+                            <DataGridTextColumn Header="CONCEPTO" Binding="{Binding Concepto}" Width="*"/>
+                            <DataGridTextColumn Header="BENEFICIARIO" Binding="{Binding Beneficiario}" Width="150"/>
+                            <DataGridTextColumn Header="NRO. DOC." Binding="{Binding NroDocumento}" Width="100"/>
+                            
+                            <!-- Debe (Ingreso) -->
+                            <DataGridTemplateColumn Header="INGRESO" Width="110">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding DebeText}" 
+                                                   Foreground="#40C060" FontWeight="Bold" 
+                                                   HorizontalAlignment="Right" VerticalAlignment="Center" Padding="0,0,10,0"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            
+                            <!-- Haber (Egreso) -->
+                            <DataGridTemplateColumn Header="EGRESO" Width="110">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding HaberText}" 
+                                                   Foreground="#C04040" FontWeight="Bold" 
+                                                   HorizontalAlignment="Right" VerticalAlignment="Center" Padding="0,0,10,0"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <!-- Totales Reconciliación -->
+                    <Border Grid.Row="2" Background="#1A1A1A" Padding="16,12" Margin="0,8,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <TextBlock Text="Instrucciones: Tildá los movimientos que figuren en tu extracto de banco para conciliarlos." 
+                                       FontSize="11" Foreground="#506070" VerticalAlignment="Center"/>
+                            
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <StackPanel Margin="0,0,20,0">
+                                    <TextBlock Text="SALDO INIC. CONCIL." FontSize="9" Foreground="#607080" FontWeight="Bold" HorizontalAlignment="Right"/>
+                                    <TextBlock x:Name="TxtConciliaSaldoInic" Text="$ 0,00" FontSize="14" FontWeight="Bold" Foreground="#8090A0" HorizontalAlignment="Right"/>
+                                </StackPanel>
+                                <StackPanel Margin="0,0,20,0">
+                                    <TextBlock Text="INGRESOS (+) " FontSize="9" Foreground="#607080" FontWeight="Bold" HorizontalAlignment="Right"/>
+                                    <TextBlock x:Name="TxtConciliaIngresos" Text="$ 0,00" FontSize="14" FontWeight="Bold" Foreground="#40C060" HorizontalAlignment="Right"/>
+                                </StackPanel>
+                                <StackPanel Margin="0,0,20,0">
+                                    <TextBlock Text="EGRESOS (-) " FontSize="9" Foreground="#607080" FontWeight="Bold" HorizontalAlignment="Right"/>
+                                    <TextBlock x:Name="TxtConciliaEgresos" Text="$ 0,00" FontSize="14" FontWeight="Bold" Foreground="#C04040" HorizontalAlignment="Right"/>
+                                </StackPanel>
+                                <StackPanel Margin="0,0,20,0">
+                                    <TextBlock Text="SALDO CALCULADO" FontSize="9" Foreground="#607080" FontWeight="Bold" HorizontalAlignment="Right"/>
+                                    <TextBlock x:Name="TxtConciliaCalculado" Text="$ 0,00" FontSize="14" FontWeight="Bold" Foreground="#D0B050" HorizontalAlignment="Right"/>
+                                </StackPanel>
+                                <StackPanel>
+                                    <TextBlock Text="DIFERENCIA" FontSize="9" Foreground="#607080" FontWeight="Bold" HorizontalAlignment="Right"/>
+                                    <TextBlock x:Name="TxtConciliaDiferencia" Text="$ 0,00" FontSize="14" FontWeight="Bold" Foreground="#C04040" HorizontalAlignment="Right"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- Depósitos Bancarios -->
+            <TabItem Header="📥  Depósitos">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="320"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Lado izquierdo: Grilla de Cheques en Cartera -->
+                    <Grid Grid.Column="0" Margin="0,0,12,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        
+                        <Border Grid.Row="0" Background="#1E1E1E" Padding="12,8" Margin="0,0,0,8">
+                            <TextBlock Text="Cheques en Cartera (Disponibles para Depositar)" Foreground="#D0D8E0" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"/>
+                        </Border>
+
+                        <DataGrid x:Name="DgDepositoCheques" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
+                                  Background="#141414" Foreground="#D0D8E0" FontSize="13"
+                                  RowBackground="#1A1A1A" AlternatingRowBackground="#1E1E1E"
+                                  HorizontalGridLinesBrush="#2A2A2A" BorderThickness="0" RowHeight="38">
+                            <DataGrid.Columns>
+                                <DataGridTemplateColumn Header="SEL." Width="50">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding Seleccionado, UpdateSourceTrigger=PropertyChanged}" 
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                      Click="ChkDepositoCheque_Click"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="NRO CHEQUE" Binding="{Binding NroCheque}" Width="110"/>
+                                <DataGridTextColumn Header="BANCO" Binding="{Binding Banco}" Width="*"/>
+                                <DataGridTextColumn Header="FECHA PAGO" Binding="{Binding FechaPago, StringFormat='dd/MM/yyyy'}" Width="100"/>
+                                <DataGridTextColumn Header="LIBRADOR" Binding="{Binding Librador}" Width="150"/>
+                                <DataGridTextColumn Header="IMPORTE" Binding="{Binding Monto, StringFormat='$ #,##0.00'}" Width="110">
+                                    <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="HorizontalAlignment" Value="Right"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="Foreground" Value="#60D090"/><Setter Property="VerticalAlignment" Value="Center"/><Setter Property="Padding" Value="0,0,8,0"/></Style></DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+
+                    <!-- Lado derecho: Datos de Depósito y Totales -->
+                    <Border Grid.Column="1" Background="#1E1E1E" Padding="16,12" CornerRadius="4">
+                        <StackPanel>
+                            <TextBlock Text="DATOS DEL DEPÓSITO" Foreground="#7AAAE0" FontWeight="Bold" FontSize="11" Margin="0,0,0,14"/>
+
+                            <TextBlock Text="Banco Destino *" Foreground="#809090" Margin="0,0,0,4"/>
+                            <ComboBox x:Name="CboDepositoBanco" Height="30" Foreground="#F0F0F0" Background="#2A2A2A" Margin="0,0,0,12"/>
+
+                            <TextBlock Text="Caja Origen (Efectivo)" Foreground="#809090" Margin="0,0,0,4"/>
+                            <ComboBox x:Name="CboDepositoCaja" Height="30" Foreground="#F0F0F0" Background="#2A2A2A" Margin="0,0,0,12"/>
+
+                            <TextBlock Text="N° Boleta / Comprobante *" Foreground="#809090" Margin="0,0,0,4"/>
+                            <TextBox x:Name="TxtDepositoComprobante" Height="30" Foreground="#F0F0F0" Background="#2A2A2A" BorderBrush="#444" BorderThickness="1" Padding="6,4" Margin="0,0,0,12"/>
+
+                            <TextBlock Text="Fecha Depósito *" Foreground="#809090" Margin="0,0,0,4"/>
+                            <DatePicker x:Name="DtpDepositoFecha" Height="30" Margin="0,0,0,12"/>
+
+                            <TextBlock Text="Monto Efectivo a Depositar" Foreground="#809090" Margin="0,0,0,4"/>
+                            <TextBox x:Name="TxtDepositoEfectivo" Height="30" Foreground="#F0F0F0" Background="#2A2A2A" BorderBrush="#444" BorderThickness="1" Padding="6,4" Text="0.00" TextChanged="TxtDepositoEfectivo_TextChanged" Margin="0,0,0,12"/>
+
+                            <TextBlock Text="Observaciones" Foreground="#809090" Margin="0,0,0,4"/>
+                            <TextBox x:Name="TxtDepositoObservaciones" Height="60" TextWrapping="Wrap" AcceptsReturn="True" Foreground="#F0F0F0" Background="#2A2A2A" BorderBrush="#444" BorderThickness="1" Padding="6,4" Margin="0,0,0,20"/>
+
+                            <Separator Background="#333" Margin="0,0,0,16"/>
+
+                            <!-- Totales -->
+                            <Grid Margin="0,0,0,8">
+                                <TextBlock Text="Total Cheques:" Foreground="#8090A0"/>
+                                <TextBlock x:Name="TxtDepTotalCheques" Text="$ 0,00" Foreground="#F0F0F0" FontWeight="Bold" HorizontalAlignment="Right"/>
+                            </Grid>
+                            <Grid Margin="0,0,0,8">
+                                <TextBlock Text="Total Efectivo:" Foreground="#8090A0"/>
+                                <TextBlock x:Name="TxtDepTotalEfectivo" Text="$ 0,00" Foreground="#F0F0F0" FontWeight="Bold" HorizontalAlignment="Right"/>
+                            </Grid>
+                            <Grid Margin="0,0,0,24">
+                                <TextBlock Text="TOTAL DEPOSITADO:" Foreground="#D0B050" FontWeight="Bold" FontSize="14"/>
+                                <TextBlock x:Name="TxtDepTotalDeposito" Text="$ 0,00" Foreground="#D0B050" FontWeight="Bold" FontSize="16" HorizontalAlignment="Right"/>
+                            </Grid>
+
+                            <Button Content="✓ Guardar Depósito" Height="38" HorizontalAlignment="Stretch"
+                                    Background="#1A3A2A" Foreground="#64C880" BorderBrush="#2A5A3A" BorderThickness="1" FontSize="14" FontWeight="Bold"
+                                    Click="BtnDepositoGuardar_Click"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- Chequeras -->
+            <TabItem Header="🎫  Chequeras">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <Border Background="#1E1E1E" Padding="12,8" Margin="0,0,0,8">
+                        <Button Content="+ Nueva Chequera" Height="30" Padding="12,0" HorizontalAlignment="Left"
+                                Click="BtnNuevaChequera_Click"/>
+                    </Border>
+                    <DataGrid x:Name="DgChequeras" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
+                              Background="#141414" Foreground="#D0D8E0" FontSize="13"
+                              RowBackground="#1A1A1A" AlternatingRowBackground="#1E1E1E"
+                              HorizontalGridLinesBrush="#2A2A2A" BorderThickness="0" RowHeight="38">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="NOMBRE/IDENTIFICACIÓN" Binding="{Binding Nombre}" Width="*">
+                                <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="VerticalAlignment" Value="Center"/><Setter Property="Padding" Value="8,0"/></Style></DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="CUENTA BANCARIA" Binding="{Binding CuentaNombre}" Width="200"/>
+                            <DataGridTextColumn Header="DESDE" Binding="{Binding Desde}" Width="100"/>
+                            <DataGridTextColumn Header="HASTA" Binding="{Binding Hasta}" Width="100"/>
+                            <DataGridTextColumn Header="SIGUIENTE N°" Binding="{Binding SiguienteNumero}" Width="110">
+                                <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="FontWeight" Value="Bold"/><Setter Property="Foreground" Value="#60A0C0"/></Style></DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTemplateColumn Header="TIPO" Width="130">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock VerticalAlignment="Center" Padding="8,0" FontSize="12">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Tipo}" Value="0"><Setter Property="Text" Value="Tradicional"/><Setter Property="Foreground" Value="#8090A0"/></DataTrigger>
+                                                        <DataTrigger Binding="{Binding Tipo}" Value="1"><Setter Property="Text" Value="Pago Diferido"/><Setter Property="Foreground" Value="#C080C0"/></DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Header="ESTADO" Width="100">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock VerticalAlignment="Center" Padding="8,0" FontSize="11" FontWeight="Bold">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Activa}" Value="True"><Setter Property="Text" Value="ACTIVA"/><Setter Property="Foreground" Value="#40C060"/></DataTrigger>
+                                                        <DataTrigger Binding="{Binding Activa}" Value="False"><Setter Property="Text" Value="INACTIVA"/><Setter Property="Foreground" Value="#808080"/></DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <!-- Reportes y Proyección -->
+            <TabItem Header="📊  Reportes y Proyección">
+                <Grid>
+                    <TabControl TabStripPlacement="Left" Background="#141414" BorderBrush="#2A2A2A">
+                        <!-- Sub-tab 1: Reporte de Cheques -->
+                        <TabItem Header="📄  Cheques">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <Border Background="#1E1E1E" Padding="12,8" Margin="0,0,0,8">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="Tipo:" Foreground="#809090" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <ComboBox x:Name="CboRepChequeTipo" Width="120" Height="30" Foreground="#F0F0F0" Background="#2A2A2A" Margin="0,0,12,0">
+                                            <ComboBoxItem Content="Todos" IsSelected="True"/>
+                                            <ComboBoxItem Content="Recibidos"/>
+                                            <ComboBoxItem Content="Emitidos"/>
+                                        </ComboBox>
+
+                                        <TextBlock Text="Estado:" Foreground="#809090" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <ComboBox x:Name="CboRepChequeEstado" Width="120" Height="30" Foreground="#F0F0F0" Background="#2A2A2A" Margin="0,0,12,0">
+                                            <ComboBoxItem Content="Todos" IsSelected="True"/>
+                                            <ComboBoxItem Content="Cartera"/>
+                                            <ComboBoxItem Content="Depositado"/>
+                                            <ComboBoxItem Content="Cobrado"/>
+                                            <ComboBoxItem Content="Entregado"/>
+                                            <ComboBoxItem Content="Rechazado"/>
+                                            <ComboBoxItem Content="Anulado"/>
+                                        </ComboBox>
+
+                                        <TextBlock Text="Banco:" Foreground="#809090" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <ComboBox x:Name="CboRepChequeBanco" Width="150" Height="30" Foreground="#F0F0F0" Background="#2A2A2A" Margin="0,0,12,0"/>
+
+                                        <TextBlock Text="Desde:" Foreground="#809090" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <DatePicker x:Name="DtpRepChequeDesde" Width="110" Height="30" Margin="0,0,12,0"/>
+
+                                        <TextBlock Text="Hasta:" Foreground="#809090" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <DatePicker x:Name="DtpRepChequeHasta" Width="110" Height="30" Margin="0,0,12,0"/>
+
+                                        <Button Content="Buscar" Height="30" Width="80" Click="BtnRepChequeBuscar_Click"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <DataGrid x:Name="DgRepCheques" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
+                                          Background="#141414" Foreground="#D0D8E0" FontSize="13"
+                                          RowBackground="#1A1A1A" AlternatingRowBackground="#1E1E1E"
+                                          HorizontalGridLinesBrush="#2A2A2A" BorderThickness="0" RowHeight="38">
+                                    <DataGrid.Columns>
+                                        <DataGridTemplateColumn Header="TIPO" Width="90">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Border CornerRadius="4" Padding="6,2" Margin="4" HorizontalAlignment="Left">
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Tipo}" Value="0"><Setter Property="Background" Value="#0A2010"/></DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Tipo}" Value="1"><Setter Property="Background" Value="#200A10"/></DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+                                                        <TextBlock FontSize="11" FontWeight="Bold">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding Tipo}" Value="0"><Setter Property="Text" Value="RECIBIDO"/><Setter Property="Foreground" Value="#40C060"/></DataTrigger>
+                                                                        <DataTrigger Binding="{Binding Tipo}" Value="1"><Setter Property="Text" Value="EMITIDO"/><Setter Property="Foreground" Value="#C06080"/></DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTextColumn Header="N° CHEQUE" Binding="{Binding NroCheque}" Width="110">
+                                            <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="Foreground" Value="#60A0C0"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="VerticalAlignment" Value="Center"/><Setter Property="Padding" Value="8,0"/></Style></DataGridTextColumn.ElementStyle>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Header="BANCO" Binding="{Binding Banco}" Width="130"/>
+                                        <DataGridTextColumn Header="LIBRADOR/BENEF." Binding="{Binding Librador}" Width="150"/>
+                                        <DataGridTextColumn Header="F. EMISIÓN" Binding="{Binding FechaEmision, StringFormat='dd/MM/yyyy'}" Width="100"/>
+                                        <DataGridTextColumn Header="F. PAGO" Binding="{Binding FechaPago, StringFormat='dd/MM/yyyy'}" Width="100">
+                                            <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="FontWeight" Value="Bold"/></Style></DataGridTextColumn.ElementStyle>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Header="MONTO" Binding="{Binding Monto, StringFormat='$ #,##0.00'}" Width="110">
+                                            <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="FontWeight" Value="Bold"/><Setter Property="HorizontalAlignment" Value="Right"/><Setter Property="Padding" Value="0,0,10,0"/></Style></DataGridTextColumn.ElementStyle>
+                                        </DataGridTextColumn>
+                                        <DataGridTemplateColumn Header="ESTADO" Width="100">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock FontSize="11" FontWeight="Bold" VerticalAlignment="Center" Padding="8,0">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Estado}" Value="0"><Setter Property="Text" Value="CARTERA"/><Setter Property="Foreground" Value="#C0A020"/></DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Estado}" Value="1"><Setter Property="Text" Value="DEPOSITAD."/><Setter Property="Foreground" Value="#4090D0"/></DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Estado}" Value="2"><Setter Property="Text" Value="COBRADO"/><Setter Property="Foreground" Value="#40C060"/></DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Estado}" Value="3"><Setter Property="Text" Value="ENTREGADO"/><Setter Property="Foreground" Value="#C060A0"/></DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Estado}" Value="4"><Setter Property="Text" Value="RECHAZAD."/><Setter Property="Foreground" Value="#C04040"/></DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Estado}" Value="5"><Setter Property="Text" Value="ANULADO"/><Setter Property="Foreground" Value="#808080"/></DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                                
+                                <Border Grid.Row="2" Background="#1E1E1E" Padding="12,8" Margin="0,8,0,0">
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <TextBlock Text="Total Cheques:" Foreground="#809090" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBlock x:Name="TxtRepChequeTotal" Text="$ 0,00" Foreground="#60A0C0" FontSize="14" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </TabItem>
+                        
+                        <!-- Sub-tab 2: Reporte de Depósitos -->
+                        <TabItem Header="📥  Depósitos">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <Border Background="#1E1E1E" Padding="12,8" Margin="0,0,0,8">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="Cuenta Banco:" Foreground="#809090" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <ComboBox x:Name="CboRepDepCuenta" Width="180" Height="30" Foreground="#F0F0F0" Background="#2A2A2A" Margin="0,0,12,0"/>
+
+                                        <TextBlock Text="Desde:" Foreground="#809090" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <DatePicker x:Name="DtpRepDepDesde" Width="120" Height="30" Margin="0,0,12,0"/>
+
+                                        <TextBlock Text="Hasta:" Foreground="#809090" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <DatePicker x:Name="DtpRepDepHasta" Width="120" Height="30" Margin="0,0,12,0"/>
+
+                                        <Button Content="Buscar" Height="30" Width="80" Click="BtnRepDepBuscar_Click"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <DataGrid x:Name="DgRepDepositos" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
+                                          Background="#141414" Foreground="#D0D8E0" FontSize="13"
+                                          RowBackground="#1A1A1A" AlternatingRowBackground="#1E1E1E"
+                                          HorizontalGridLinesBrush="#2A2A2A" BorderThickness="0" RowHeight="38">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="FECHA" Binding="{Binding Fecha, StringFormat='dd/MM/yyyy HH:mm'}" Width="130"/>
+                                        <DataGridTextColumn Header="CUENTA BANCARIA" Binding="{Binding CuentaNombre}" Width="160"/>
+                                        <DataGridTextColumn Header="BOLETA/COMPROB." Binding="{Binding NroDocumento}" Width="140">
+                                            <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="Foreground" Value="#60A0C0"/><Setter Property="FontWeight" Value="SemiBold"/></Style></DataGridTextColumn.ElementStyle>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Header="DETALLE / CONCEPTO" Binding="{Binding Concepto}" Width="*"/>
+                                        <DataGridTextColumn Header="IMPORTE" Binding="{Binding Monto, StringFormat='$ #,##0.00'}" Width="120">
+                                            <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="FontWeight" Value="Bold"/><Setter Property="HorizontalAlignment" Value="Right"/><Setter Property="Padding" Value="0,0,10,0"/></Style></DataGridTextColumn.ElementStyle>
+                                        </DataGridTextColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                                
+                                <Border Grid.Row="2" Background="#1E1E1E" Padding="12,8" Margin="0,8,0,0">
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <TextBlock Text="Total Depositado:" Foreground="#809090" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBlock x:Name="TxtRepDepTotal" Text="$ 0,00" Foreground="#40C060" FontSize="14" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </TabItem>
+
+                        <!-- Sub-tab 3: Proyección de Saldos -->
+                        <TabItem Header="📈  Proyección de Saldos">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                
+                                <Border Grid.Row="0" Background="#1E1E1E" Padding="12,8" Margin="0,0,0,8">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="Cuenta de Banco:" Foreground="#809090" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <ComboBox x:Name="CboProyCuenta" Width="180" Height="30" Foreground="#F0F0F0" Background="#2A2A2A" Margin="0,0,12,0"/>
+
+                                        <TextBlock Text="Fecha Límite:" Foreground="#809090" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <DatePicker x:Name="DtpProyFecha" Width="120" Height="30" Margin="0,0,12,0"/>
+
+                                        <Button Content="Ver Proyección" Height="30" Width="120" Click="BtnProyCalcular_Click"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Stats Proyección -->
+                                <Grid Grid.Row="1" Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <Border Background="#1E2028" CornerRadius="4" Padding="12,8">
+                                        <StackPanel>
+                                            <TextBlock Text="SALDO ACTUAL" FontSize="10" FontWeight="Bold" Foreground="#607080"/>
+                                            <TextBlock x:Name="TxtProySaldoActual" Text="$ 0,00" FontSize="18" FontWeight="Bold" Foreground="#80A0C0" Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="2" Background="#1A2A1A" CornerRadius="4" Padding="12,8">
+                                        <StackPanel>
+                                            <TextBlock Text="CHEQUES A COBRAR (+)" FontSize="10" FontWeight="Bold" Foreground="#406040"/>
+                                            <TextBlock x:Name="TxtProyIngresos" Text="$ 0,00" FontSize="18" FontWeight="Bold" Foreground="#40C060" Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="4" Background="#2A1E20" CornerRadius="4" Padding="12,8">
+                                        <StackPanel>
+                                            <TextBlock Text="CHEQUES A DEBITAR (-)" FontSize="10" FontWeight="Bold" Foreground="#604040"/>
+                                            <TextBlock x:Name="TxtProyEgresos" Text="$ 0,00" FontSize="18" FontWeight="Bold" Foreground="#C04040" Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="6" Background="#22281A" CornerRadius="4" Padding="12,8">
+                                        <StackPanel>
+                                            <TextBlock Text="SALDO PROYECTADO FINAL" FontSize="10" FontWeight="Bold" Foreground="#606040"/>
+                                            <TextBlock x:Name="TxtProySaldoFinal" Text="$ 0,00" FontSize="18" FontWeight="Bold" Foreground="#D0B050" Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+
+                                <!-- Evolución Diaria y Cheques -->
+                                <Grid Grid.Row="2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="1.2*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Grilla de evolución diaria -->
+                                    <Grid Grid.Column="0">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Text="Evolución de Saldo Proyectado Diaria" Foreground="#8090A0" FontWeight="SemiBold" Margin="0,4,0,6"/>
+                                        <DataGrid x:Name="DgProyEvolucion" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
+                                                  Background="#141414" Foreground="#D0D8E0" FontSize="12"
+                                                  RowBackground="#1A1A1A" AlternatingRowBackground="#1E1E1E"
+                                                  HorizontalGridLinesBrush="#2A2A2A" BorderThickness="0" RowHeight="32"
+                                                  SelectionChanged="DgProyEvolucion_SelectionChanged">
+                                            <DataGrid.Columns>
+                                                <DataGridTextColumn Header="FECHA" Binding="{Binding Fecha, StringFormat='dd/MM/yyyy (ddd)'}" Width="*"/>
+                                                <DataGridTextColumn Header="COBROS (+)" Binding="{Binding Ingresos, StringFormat='$ #,##0.00'}" Width="100">
+                                                    <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="Foreground" Value="#40C060"/><Setter Property="HorizontalAlignment" Value="Right"/><Setter Property="Padding" Value="0,0,6,0"/></Style></DataGridTextColumn.ElementStyle>
+                                                </DataGridTextColumn>
+                                                <DataGridTextColumn Header="DÉBITOS (-)" Binding="{Binding Egresos, StringFormat='$ #,##0.00'}" Width="100">
+                                                    <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="Foreground" Value="#C04040"/><Setter Property="HorizontalAlignment" Value="Right"/><Setter Property="Padding" Value="0,0,6,0"/></Style></DataGridTextColumn.ElementStyle>
+                                                </DataGridTextColumn>
+                                                <DataGridTextColumn Header="SALDO PROY." Binding="{Binding SaldoProyectado, StringFormat='$ #,##0.00'}" Width="110">
+                                                    <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="FontWeight" Value="Bold"/><Setter Property="Foreground" Value="#D0B050"/><Setter Property="HorizontalAlignment" Value="Right"/><Setter Property="Padding" Value="0,0,6,0"/></Style></DataGridTextColumn.ElementStyle>
+                                                </DataGridTextColumn>
+                                            </DataGrid.Columns>
+                                        </DataGrid>
+                                    </Grid>
+
+                                    <!-- Cheques del día seleccionado -->
+                                    <Grid Grid.Column="2">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
+                                        <TextBlock x:Name="TxtProyChequesTitulo" Text="Cheques involucrados en la Proyección" Foreground="#8090A0" FontWeight="SemiBold" Margin="0,4,0,6"/>
+                                        <DataGrid x:Name="DgProyChequesPendientes" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
+                                                  Background="#141414" Foreground="#D0D8E0" FontSize="12"
+                                                  RowBackground="#1A1A1A" AlternatingRowBackground="#1E1E1E"
+                                                  HorizontalGridLinesBrush="#2A2A2A" BorderThickness="0" RowHeight="32">
+                                            <DataGrid.Columns>
+                                                <DataGridTextColumn Header="F. PAGO" Binding="{Binding Fecha, StringFormat='dd/MM/yyyy'}" Width="90"/>
+                                                <DataGridTextColumn Header="OPERACIÓN" Binding="{Binding Tipo}" Width="100">
+                                                    <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="FontWeight" Value="Bold"/></Style></DataGridTextColumn.ElementStyle>
+                                                </DataGridTextColumn>
+                                                <DataGridTextColumn Header="N° CHEQUE" Binding="{Binding NroCheque}" Width="95">
+                                                    <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="Foreground" Value="#60A0C0"/><Setter Property="FontWeight" Value="SemiBold"/></Style></DataGridTextColumn.ElementStyle>
+                                                </DataGridTextColumn>
+                                                <DataGridTextColumn Header="MONTO" Binding="{Binding Monto, StringFormat='$ #,##0.00'}" Width="95">
+                                                    <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="FontWeight" Value="Bold"/><Setter Property="HorizontalAlignment" Value="Right"/><Setter Property="Padding" Value="0,0,6,0"/></Style></DataGridTextColumn.ElementStyle>
+                                                </DataGridTextColumn>
+                                                <DataGridTextColumn Header="DETALLE" Binding="{Binding Detalle}" Width="*"/>
+                                            </DataGrid.Columns>
+                                        </DataGrid>
+                                    </Grid>
+                                </Grid>
+                            </Grid>
+                        </TabItem>
+                    </TabControl>
+                </Grid>
+            </TabItem>
+        </TabControl>
+    </Grid>
+</Page>

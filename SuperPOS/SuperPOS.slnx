@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SuperPOS.AFIP/SuperPOS.AFIP.csproj" />
+    <Project Path="src/SuperPOS.API/SuperPOS.API.csproj" />
+    <Project Path="src/SuperPOS.Client/SuperPOS.Client.csproj" />
+    <Project Path="src/SuperPOS.Fiscal/SuperPOS.Fiscal.csproj" />
+    <Project Path="src/SuperPOS.Shared/SuperPOS.Shared.csproj" />
+  </Folder>
+</Solution>

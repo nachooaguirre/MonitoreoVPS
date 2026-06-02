@@ -1,0 +1,33 @@
+<Window x:Class="SuperPOS.Client.Views.Inventario.NuevoInventarioWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        Title="Nuevo inventario físico" Width="440" SizeToContent="Height"
+        WindowStartupLocation="CenterScreen" Background="#141414" ResizeMode="NoResize">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Iniciar inventario" FontSize="18" FontWeight="Bold" Foreground="#E8F0FF" Margin="0,0,0,14"/>
+
+        <StackPanel Grid.Row="1" Margin="0,0,0,12">
+            <TextBlock Text="DESCRIPCIÓN" FontSize="10" FontWeight="Bold" Foreground="#607080" Margin="0,0,0,6"/>
+            <ui:TextBox x:Name="TxtDescripcion" Height="36" FontSize="14" PlaceholderText="Ej. Inventario abril — depósito"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" Margin="0,0,0,20">
+            <TextBlock Text="SUCURSAL" FontSize="10" FontWeight="Bold" Foreground="#607080" Margin="0,0,0,6"/>
+            <ComboBox x:Name="CboSucursal" Height="36" FontSize="14" Padding="8,4"
+                      DisplayMemberPath="Nombre" SelectedValuePath="Id"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
+            <ui:Button Content="Cancelar" Height="36" Padding="20,0" Margin="0,0,8,0" Click="BtnCancelar_Click"/>
+            <ui:Button Content="Crear" Appearance="Primary" Height="36" Padding="20,0" Click="BtnCrear_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

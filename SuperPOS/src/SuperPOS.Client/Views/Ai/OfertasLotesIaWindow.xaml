@@ -1,0 +1,33 @@
+<Window x:Class="SuperPOS.Client.Views.Ai.OfertasLotesIaWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        Title="Ofertas por lote a vencer (desde IA)" Width="880" Height="520"
+        WindowStartupLocation="CenterScreen" Background="#141414">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Text="Ajustá el precio de oferta. Se aplica a la ficha del artículo (Precio oferta) para vender o liquidar el lote."
+                   TextWrapping="Wrap" Foreground="#8090A0" FontSize="12" Margin="0,0,0,12"/>
+        <DataGrid x:Name="Dg" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="False"
+                  RowHeight="32" FontSize="13" CanUserAddRows="False" CanUserDeleteRows="False"
+                  GridLinesVisibility="Horizontal" AlternatingRowBackground="#1A1A1E" Background="#181818">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="ID" Binding="{Binding IdArticulo}" Width="50" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Descripción" Binding="{Binding Descripcion}" Width="*" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Lote" Binding="{Binding LoteNro}" Width="100" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Vence" Binding="{Binding FechaVenceStr}" Width="90" IsReadOnly="True"/>
+                <DataGridTextColumn Header="P. venta" Binding="{Binding PrecioVenta, StringFormat=N2}" Width="80" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Nuevo P. oferta" Binding="{Binding NuevoPrecioOferta, StringFormat=N2}" Width="120"/>
+            </DataGrid.Columns>
+        </DataGrid>
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+            <ui:Button Appearance="Secondary" Content="Llenar -10% sobre venta" Height="32" Padding="12,0" Margin="0,0,8,0" Click="BtnSugerir10_Click"/>
+            <ui:Button Appearance="Primary" Content="Aplicar a artículos" Height="32" Padding="12,0" Click="BtnAplicar_Click"/>
+            <ui:Button Appearance="Secondary" Content="Cerrar" Height="32" Padding="12,0" Margin="8,0,0,0" Click="BtnCerrar_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

@@ -1,0 +1,58 @@
+<Page x:Class="SuperPOS.Client.Views.Proveedores.ProveedoresPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="Proveedores">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <TextBlock Text="Proveedores" FontSize="24" FontWeight="Bold" VerticalAlignment="Center"/>
+            <ui:Button Grid.Column="1" Content="+ Nuevo Proveedor" Appearance="Primary" Click="BtnNuevo_Click"/>
+        </Grid>
+
+        <Grid Grid.Row="1" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <ui:TextBox x:Name="TxtBuscar" Grid.Column="0" PlaceholderText="Buscar por nombre o CUIT..." Margin="0,0,8,0" KeyDown="TxtBuscar_KeyDown"/>
+            <ui:Button Grid.Column="1" Content="Buscar" Click="BtnBuscar_Click"/>
+        </Grid>
+
+        <DataGrid x:Name="DgProveedores" Grid.Row="2" AutoGenerateColumns="False" IsReadOnly="True"
+                  SelectionMode="Single" GridLinesVisibility="Horizontal" CanUserResizeRows="False"
+                  RowHeight="32" FontSize="13" MouseDoubleClick="DgProveedores_MouseDoubleClick">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="55"/>
+                <DataGridTextColumn Header="Razón Social" Binding="{Binding RazonSocial}" Width="*"/>
+                <DataGridTextColumn Header="CUIT" Binding="{Binding Cuit}" Width="120"/>
+                <DataGridTextColumn Header="Teléfono" Binding="{Binding Telefono}" Width="110"/>
+                <DataGridTextColumn Header="Email" Binding="{Binding Email}" Width="180"/>
+                <DataGridTextColumn Header="Días Entrega" Binding="{Binding DiasEntrega}" Width="90"/>
+                <DataGridTemplateColumn Header="Acciones" Width="100">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Button Content="✏" Width="32" Height="26" Margin="2,0" Tag="{Binding}" Click="BtnEditar_Click"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <Grid Grid.Row="3" Margin="0,8,0,0">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <TextBlock x:Name="TxtTotal" VerticalAlignment="Center" Opacity="0.6"/>
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Content="◀" x:Name="BtnPrev" Click="BtnPrev_Click" Width="32" Height="28" Margin="4,0"/>
+                <TextBlock x:Name="TxtPagina" VerticalAlignment="Center" Margin="4,0"/>
+                <Button Content="▶" x:Name="BtnNext" Click="BtnNext_Click" Width="32" Height="28" Margin="4,0"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Page>

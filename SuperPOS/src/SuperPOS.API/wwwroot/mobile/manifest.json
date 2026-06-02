@@ -1,0 +1,18 @@
+{
+  "short_name": "SuperPOS Mobile",
+  "name": "SuperPOS Terminal Depósito",
+  "description": "Terminal móvil para control de inventario, recepción de camión y etiquetado.",
+  "icons": [
+    {
+      "src": "icon.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/mobile/index.html",
+  "background_color": "#121212",
+  "theme_color": "#6366f1",
+  "display": "standalone",
+  "orientation": "portrait"
+}

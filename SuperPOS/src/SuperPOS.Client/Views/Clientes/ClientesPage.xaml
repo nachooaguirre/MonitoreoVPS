@@ -1,0 +1,71 @@
+<Page x:Class="SuperPOS.Client.Views.Clientes.ClientesPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="Clientes">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <TextBlock Text="Clientes" FontSize="24" FontWeight="Bold" VerticalAlignment="Center"/>
+            <ui:Button Grid.Column="1" Content="+ Nuevo Cliente" Appearance="Primary" Click="BtnNuevo_Click"/>
+        </Grid>
+
+        <Grid Grid.Row="1" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <ui:TextBox x:Name="TxtBuscar" Grid.Column="0" PlaceholderText="Buscar por nombre, razón social o CUIT..." Margin="0,0,8,0" KeyDown="TxtBuscar_KeyDown"/>
+            <CheckBox x:Name="ChkCtaCte" Grid.Column="1" Content="Solo con Cta. Cte." Margin="0,0,8,0" VerticalAlignment="Center" Checked="Filtro_Changed" Unchecked="Filtro_Changed"/>
+            <ui:Button Grid.Column="2" Content="Buscar" Click="BtnBuscar_Click"/>
+        </Grid>
+
+        <DataGrid x:Name="DgClientes" Grid.Row="2" AutoGenerateColumns="False" IsReadOnly="True"
+                  SelectionMode="Single" GridLinesVisibility="Horizontal" CanUserResizeRows="False"
+                  RowHeight="32" FontSize="13" MouseDoubleClick="DgClientes_MouseDoubleClick">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="55"/>
+                <DataGridTextColumn Header="Razón Social" Binding="{Binding RazonSocial}" Width="*"/>
+                <DataGridTextColumn Header="CUIT" Binding="{Binding Cuit}" Width="120"/>
+                <DataGridTextColumn Header="Condición IVA" Binding="{Binding CondicionIva}" Width="100"/>
+                <DataGridTextColumn Header="Teléfono" Binding="{Binding Telefono}" Width="110"/>
+                <DataGridTextColumn Header="Saldo Cta.Cte." Width="110">
+                    <DataGridTextColumn.Binding><Binding Path="SaldoCtaCte" StringFormat="N2"/></DataGridTextColumn.Binding>
+                    <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="HorizontalAlignment" Value="Right"/></Style></DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="Límite Crédito" Width="110">
+                    <DataGridTextColumn.Binding><Binding Path="LimiteCredito" StringFormat="N2"/></DataGridTextColumn.Binding>
+                    <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="HorizontalAlignment" Value="Right"/></Style></DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTemplateColumn Header="Acciones" Width="100">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Button Content="✏" Width="32" Height="26" Margin="2,0" Tag="{Binding}" Click="BtnEditar_Click"/>
+                                <Button Content="🗑" Width="32" Height="26" Margin="2,0" Tag="{Binding}" Click="BtnEliminar_Click"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <Grid Grid.Row="3" Margin="0,8,0,0">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <TextBlock x:Name="TxtTotal" VerticalAlignment="Center" Opacity="0.6"/>
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Content="◀" x:Name="BtnPrev" Click="BtnPrev_Click" Width="32" Height="28" Margin="4,0"/>
+                <TextBlock x:Name="TxtPagina" VerticalAlignment="Center" Margin="4,0"/>
+                <Button Content="▶" x:Name="BtnNext" Click="BtnNext_Click" Width="32" Height="28" Margin="4,0"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Page>

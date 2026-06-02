@@ -1,0 +1,119 @@
+<Page x:Class="SuperPOS.Client.Views.Presupuestos.PresupuestosPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="Presupuestos">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Grid Grid.Row="0" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Presupuestos" FontSize="24" FontWeight="Bold" VerticalAlignment="Center"/>
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <ui:Button Content="+ Nuevo Presupuesto" Appearance="Primary" Click="BtnNuevo_Click"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- Filtros -->
+        <Grid Grid.Row="1" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="200"/>
+                <ColumnDefinition Width="200"/>
+                <ColumnDefinition Width="150"/>
+                <ColumnDefinition Width="150"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                <TextBlock Text="Desde" FontSize="11" Margin="0,0,0,2" Opacity="0.7"/>
+                <DatePicker x:Name="DpDesde" SelectedDateChanged="Filtro_Changed"/>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                <TextBlock Text="Hasta" FontSize="11" Margin="0,0,0,2" Opacity="0.7"/>
+                <DatePicker x:Name="DpHasta" SelectedDateChanged="Filtro_Changed"/>
+            </StackPanel>
+            <StackPanel Grid.Column="2" Margin="0,0,8,0">
+                <TextBlock Text="Cliente" FontSize="11" Margin="0,0,0,2" Opacity="0.7"/>
+                <ComboBox x:Name="CmbCliente" DisplayMemberPath="RazonSocial" SelectedValuePath="Id" SelectionChanged="Filtro_Changed"/>
+            </StackPanel>
+            <StackPanel Grid.Column="3" Margin="0,0,8,0">
+                <TextBlock Text="Estado" FontSize="11" Margin="0,0,0,2" Opacity="0.7"/>
+                <ComboBox x:Name="CmbEstado" SelectionChanged="Filtro_Changed">
+                    <ComboBoxItem Content="Todos" Tag=""/>
+                    <ComboBoxItem Content="Pendiente" Tag="0"/>
+                    <ComboBoxItem Content="Aprobado" Tag="1"/>
+                    <ComboBoxItem Content="Rechazado" Tag="2"/>
+                    <ComboBoxItem Content="Facturado" Tag="3"/>
+                </ComboBox>
+            </StackPanel>
+            
+            <ui:Button Grid.Column="5" Content="Limpiar Filtros" VerticalAlignment="Bottom" Height="36" Click="BtnLimpiar_Click"/>
+        </Grid>
+
+        <!-- Tabla -->
+        <DataGrid x:Name="DgPresupuestos" Grid.Row="2" AutoGenerateColumns="False" IsReadOnly="True"
+                  SelectionMode="Single" GridLinesVisibility="Horizontal" CanUserResizeRows="False"
+                  BorderThickness="1" RowHeight="32" FontSize="13"
+                  MouseDoubleClick="DgPresupuestos_MouseDoubleClick">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Número" Binding="{Binding Numero}" Width="80"/>
+                <DataGridTextColumn Header="Fecha" Binding="{Binding Fecha, StringFormat={}{0:dd/MM/yyyy HH:mm}}" Width="130"/>
+                <DataGridTextColumn Header="Cliente" Binding="{Binding Cliente.RazonSocial}" Width="*"/>
+                <DataGridTextColumn Header="Detalle / Trabajo" Binding="{Binding Detalle}" Width="*"/>
+                <DataGridTextColumn Header="Total" Width="100">
+                    <DataGridTextColumn.Binding>
+                        <Binding Path="Total" StringFormat="C2"/>
+                    </DataGridTextColumn.Binding>
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="HorizontalAlignment" Value="Right"/>
+                            <Setter Property="FontWeight" Value="Bold"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="Estado" Binding="{Binding Estado}" Width="100">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="FontWeight" Value="SemiBold"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTemplateColumn Header="Acciones" Width="180">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Button Content="✏" Width="30" Height="26" Margin="2,0" ToolTip="Editar" Tag="{Binding}" Click="BtnEditar_Click"/>
+                                <Button Content="🗑" Width="30" Height="26" Margin="2,0" ToolTip="Eliminar" Tag="{Binding}" Click="BtnEliminar_Click"/>
+                                <ui:Button Content="⚡ Facturar" Width="80" Height="26" Margin="2,0" ToolTip="Convertir en Venta" 
+                                           Tag="{Binding}" Click="BtnFacturar_Click" Appearance="Secondary"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- Paginación -->
+        <Grid Grid.Row="3" Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="TxtTotal" VerticalAlignment="Center" Opacity="0.6"/>
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Content="◀" x:Name="BtnPrev" Click="BtnPrev_Click" Width="32" Height="28" Margin="4,0"/>
+                <TextBlock x:Name="TxtPagina" VerticalAlignment="Center" Margin="4,0"/>
+                <Button Content="▶" x:Name="BtnNext" Click="BtnNext_Click" Width="32" Height="28" Margin="4,0"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Page>

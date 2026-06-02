@@ -1,0 +1,36 @@
+<ui:FluentWindow x:Class="SuperPOS.Client.Views.Caja.BuscadorClientesWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        Title="Buscar Cliente"
+        Width="600" Height="440"
+        WindowStartupLocation="CenterOwner"
+        ExtendsContentIntoTitleBar="True">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <ui:TitleBar Grid.Row="0" Title="Seleccionar Cliente"/>
+        <Grid Grid.Row="1" Margin="12,8,12,4">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <ui:TextBox x:Name="TxtBuscar" Grid.Column="0" PlaceholderText="Nombre, razón social o CUIT..." Margin="0,0,8,0" FontSize="14" KeyDown="TxtBuscar_KeyDown"/>
+            <ui:Button Grid.Column="1" Content="Buscar" Click="BtnBuscar_Click"/>
+        </Grid>
+        <DataGrid x:Name="DgClientes" Grid.Row="2" Margin="12,4" AutoGenerateColumns="False" IsReadOnly="True"
+                  SelectionMode="Single" GridLinesVisibility="Horizontal" RowHeight="30" FontSize="13"
+                  MouseDoubleClick="DgClientes_MouseDoubleClick">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Razón Social" Binding="{Binding RazonSocial}" Width="*"/>
+                <DataGridTextColumn Header="CUIT" Binding="{Binding Cuit}" Width="120"/>
+                <DataGridTextColumn Header="Cond. IVA" Binding="{Binding CondicionIva}" Width="80"/>
+            </DataGrid.Columns>
+        </DataGrid>
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="12,8">
+            <Button Content="Cancelar" Width="90" Height="34" Margin="0,0,8,0" Click="BtnCancelar_Click"/>
+            <ui:Button Content="Seleccionar" Appearance="Primary" Width="110" Height="34" Click="BtnSeleccionar_Click"/>
+        </StackPanel>
+    </Grid>
+</ui:FluentWindow>

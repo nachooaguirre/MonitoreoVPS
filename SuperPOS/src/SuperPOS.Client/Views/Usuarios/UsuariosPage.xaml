@@ -1,0 +1,130 @@
+<Page x:Class="SuperPOS.Client.Views.Usuarios.UsuariosPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="Usuarios y Perfiles">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header con tabs -->
+        <Grid Grid.Row="0" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <TextBlock Text="Usuarios y Perfiles" FontSize="24" FontWeight="Bold" VerticalAlignment="Center"/>
+        </Grid>
+
+        <TabControl Grid.Row="1">
+            <!-- TAB USUARIOS -->
+            <TabItem Header="👤  Usuarios">
+                <Grid Margin="0,8,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <TextBlock Text="Lista de usuarios del sistema" VerticalAlignment="Center" Opacity="0.6"/>
+                        <ui:Button Grid.Column="1" Content="+ Nuevo Usuario" Appearance="Primary" Click="BtnNuevoUsuario_Click"/>
+                    </Grid>
+                    <DataGrid x:Name="DgUsuarios" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
+                              SelectionMode="Single" GridLinesVisibility="Horizontal" RowHeight="32" FontSize="13"
+                              MouseDoubleClick="DgUsuarios_MouseDoubleClick">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="45"/>
+                            <DataGridTextColumn Header="Usuario" Binding="{Binding NombreUsuario}" Width="130"/>
+                            <DataGridTextColumn Header="Nombre completo" Binding="{Binding NombreCompleto}" Width="*"/>
+                            <DataGridTextColumn Header="Perfil" Binding="{Binding Perfil.Nombre}" Width="140"/>
+                            <DataGridTextColumn Header="Email" Binding="{Binding Email}" Width="170"/>
+                            <DataGridTextColumn Header="Último acceso" Binding="{Binding UltimoAcceso, StringFormat=dd/MM/yyyy HH:mm}" Width="130"/>
+                            <DataGridCheckBoxColumn Header="Activo" Binding="{Binding Activo}" Width="60"/>
+                            <DataGridTemplateColumn Header="Acciones" Width="100">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                            <Button Content="✏" Width="32" Height="26" Margin="2,0" Tag="{Binding}" Click="BtnEditarUsuario_Click"/>
+                                            <Button Content="🗑" Width="32" Height="26" Margin="2,0" Tag="{Binding}" Click="BtnEliminarUsuario_Click"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <!-- TAB PERFILES -->
+            <TabItem Header="🔒  Perfiles de Acceso">
+                <Grid Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="240"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Lista de perfiles -->
+                    <Grid Grid.Column="0" Margin="0,0,8,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="Perfiles" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                        <ListBox x:Name="LstPerfiles" Grid.Row="1" SelectionChanged="LstPerfiles_Changed" DisplayMemberPath="Nombre"/>
+                        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,8,0,0">
+                            <ui:Button Content="+ Nuevo" Margin="0,0,4,0" Click="BtnNuevoPerfil_Click"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Editor de perfil -->
+                    <ScrollViewer Grid.Column="1" Padding="12,0">
+                        <StackPanel>
+                            <TextBlock Text="Nombre del perfil" Margin="0,0,0,4"/>
+                            <ui:TextBox x:Name="TxtNombrePerfil" Margin="0,0,0,12" PlaceholderText="Ej: Cajero"/>
+
+                            <TextBlock Text="ACCESO A SECCIONES" FontWeight="Bold" FontSize="12" Margin="0,0,0,8" Opacity="0.7"/>
+                            <WrapPanel>
+                                <CheckBox x:Name="ChkAccesoCaja"        Content="Caja / Ventas"    Width="180" Margin="0,4,8,4"/>
+                                <CheckBox x:Name="ChkAccesoArticulos"   Content="Artículos"         Width="180" Margin="0,4,8,4"/>
+                                <CheckBox x:Name="ChkAccesoClientes"    Content="Clientes"           Width="180" Margin="0,4,8,4"/>
+                                <CheckBox x:Name="ChkAccesoProveedores" Content="Proveedores"        Width="180" Margin="0,4,8,4"/>
+                                <CheckBox x:Name="ChkAccesoCompras"     Content="Compras"            Width="180" Margin="0,4,8,4"/>
+                                <CheckBox x:Name="ChkAccesoStock"       Content="Stock"              Width="180" Margin="0,4,8,4"/>
+                                <CheckBox x:Name="ChkAccesoCtaCte"      Content="Cuenta Corriente"   Width="180" Margin="0,4,8,4"/>
+                                <CheckBox x:Name="ChkAccesoReportes"    Content="Reportes"           Width="180" Margin="0,4,8,4"/>
+                                <CheckBox x:Name="ChkAccesoConfig"      Content="Configuración"      Width="180" Margin="0,4,8,4"/>
+                                <CheckBox x:Name="ChkAccesoUsuarios"    Content="Usuarios (admin)"   Width="180" Margin="0,4,8,4"/>
+                            </WrapPanel>
+
+                            <Separator Margin="0,12"/>
+                            <TextBlock Text="PERMISOS DE OPERACIÓN" FontWeight="Bold" FontSize="12" Margin="0,0,0,8" Opacity="0.7"/>
+                            <WrapPanel>
+                                <CheckBox x:Name="ChkPuedeVender"         Content="Puede vender"            Width="200" Margin="0,4,8,4"/>
+                                <CheckBox x:Name="ChkPuedeAnular"         Content="Puede anular ventas"      Width="200" Margin="0,4,8,4"/>
+                                <CheckBox x:Name="ChkPuedeDescuentos"     Content="Puede hacer descuentos"   Width="200" Margin="0,4,8,4"/>
+                                <CheckBox x:Name="ChkPuedeCambiarPrecios" Content="Puede cambiar precios"   Width="200" Margin="0,4,8,4"/>
+                                <CheckBox x:Name="ChkPuedeVerCostos"      Content="Puede ver costos"         Width="200" Margin="0,4,8,4"/>
+                                <CheckBox x:Name="ChkPuedeModifStock"     Content="Puede modificar stock"    Width="200" Margin="0,4,8,4"/>
+                                <CheckBox x:Name="ChkPuedeAbrirCaja"      Content="Puede abrir caja"         Width="200" Margin="0,4,8,4"/>
+                                <CheckBox x:Name="ChkPuedeCerrarCaja"     Content="Puede cerrar caja"        Width="200" Margin="0,4,8,4"/>
+                                <CheckBox x:Name="ChkEsAdmin"             Content="ES ADMINISTRADOR"         Width="200" Margin="0,4,8,4" FontWeight="Bold"/>
+                            </WrapPanel>
+
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="160"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                    <TextBlock Text="Descuento máximo %" Margin="0,0,0,4"/>
+                                    <ui:TextBox x:Name="TxtMaxDescuento" PlaceholderText="0"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                                <ui:Button x:Name="BtnGuardarPerfil" Content="Guardar Perfil" Appearance="Primary" Width="140" Click="BtnGuardarPerfil_Click"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </TabItem>
+        </TabControl>
+    </Grid>
+</Page>

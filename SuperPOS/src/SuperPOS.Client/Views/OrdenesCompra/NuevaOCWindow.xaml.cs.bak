@@ -1,0 +1,481 @@
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Globalization;
+using System.Runtime.CompilerServices;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using SuperPOS.Client.Services;
+using SuperPOS.Shared.Entities.Ventas;
+
+namespace SuperPOS.Client.Views.OrdenesCompra;
+
+/// <summary>Líneas iniciales (p. ej. desde asistente IA) para rellenar la OC y permitir edición.</summary>
+public record NuevaOCLineaInicial(
+    int IdArticulo, string Descripcion, string CodigoBarras, decimal CantidadPedida, decimal PrecioCosto, decimal AlicuotaIva);
+
+public partial class NuevaOCWindow : Window
+{
+    private readonly ObservableCollection<OcLineItem> _items = [];
+    private List<Articulo> _catalogoCompleto = [];
+    private readonly int? _iaProveedor;
+    private readonly IReadOnlyList<NuevaOCLineaInicial>? _iaLineas;
+
+    public NuevaOCWindow() : this(null, null) { }
+
+    /// <param name="idProveedor">Preselecciona el proveedor y carga el catálogo.</param>
+    /// <param name="lineasIa">Líneas sugeridas (el usuario las puede editar antes de guardar).</param>
+    public NuevaOCWindow(int? idProveedor, IReadOnlyList<NuevaOCLineaInicial>? lineasIa)
+    {
+        _iaProveedor = idProveedor;
+        _iaLineas = lineasIa;
+        InitializeComponent();
+        DgDetalle.ItemsSource = _items;
+        _items.CollectionChanged += (_, _) => ActualizarTotal();
+        Title = _iaLineas is { Count: > 0 } ? "Nueva Orden de Compra (desde asistente IA)" : "Nueva Orden de Compra";
+        Loaded += OnLoadedNueva;
+    }
+
+    private async void OnLoadedNueva(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var proveedores = await App.Api.GetProveedoresLista();
+            CboProveedor.DisplayMemberPath = "RazonSocial";
+            CboProveedor.SelectedValuePath = "Id";
+            CboProveedor.ItemsSource = proveedores;
+            if (proveedores == null || proveedores.Count == 0)
+                MessageBox.Show("No hay proveedores en la base de datos.\nAgregue proveedores primero.", "Sin proveedores", MessageBoxButton.OK, MessageBoxImage.Information);
+            else if (_iaProveedor.HasValue)
+            {
+                CboProveedor.SelectedValue = _iaProveedor.Value;
+                await RecargarCatalogoAsync();
+            }
+
+            if (_iaLineas is { Count: > 0 })
+            {
+                foreach (var l in _iaLineas)
+                {
+                    var line = new OcLineItem(ActualizarTotal);
+                    line.InitializeFromIa(l);
+                    _items.Add(line);
+                }
+                DgDetalle.Items.Refresh();
+                ActualizarTotal();
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error al cargar proveedores: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private async void CboProveedor_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        TxtFiltroCatalogo.Clear();
+        await RecargarCatalogoAsync();
+    }
+
+    private async void TxtFiltroCatalogo_TextChanged(object sender, TextChangedEventArgs e)
+        => AplicarFiltroCatalogo();
+
+    private async Task RecargarCatalogoAsync()
+    {
+        LstCatalogo.ItemsSource = null;
+        _catalogoCompleto = [];
+        if (CboProveedor.SelectedItem is not ProveedorSimple prov)
+        {
+            TxtCatalogoHint.Visibility = Visibility.Visible;
+            LstCatalogo.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        TxtCatalogoHint.Visibility = Visibility.Collapsed;
+        LstCatalogo.Visibility = Visibility.Visible;
+        try
+        {
+            _catalogoCompleto = await App.Api.ListarArticulosProveedor(prov.Id, buscar: null, pageSize: 500);
+            if (_catalogoCompleto.Count == 0)
+                MessageBox.Show(
+                    $"No hay artículos con proveedor asignado a «{prov.RazonSocial}».\n\nEn cada artículo (Stock → editar) debe estar el mismo proveedor seleccionado.",
+                    "Sin artículos para este proveedor",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            AplicarFiltroCatalogo();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error al cargar catálogo: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void AplicarFiltroCatalogo()
+    {
+        var filtro = TxtFiltroCatalogo.Text.Trim();
+        if (_catalogoCompleto.Count == 0)
+        {
+            LstCatalogo.ItemsSource = null;
+            return;
+        }
+
+        if (string.IsNullOrEmpty(filtro))
+        {
+            LstCatalogo.ItemsSource = _catalogoCompleto;
+            return;
+        }
+
+        LstCatalogo.ItemsSource = _catalogoCompleto
+            .Where(a =>
+                a.Descripcion.Contains(filtro, StringComparison.OrdinalIgnoreCase)
+                || a.CodigoBarras.Contains(filtro, StringComparison.OrdinalIgnoreCase)
+                || a.CodigoInterno.Contains(filtro, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    private async void TxtBuscarArt_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter) return;
+        await BuscarYAgregarPrimeroAsync();
+    }
+
+    private async void BtnAgregar_Click(object sender, RoutedEventArgs e)
+        => await BuscarYAgregarPrimeroAsync();
+
+    private async Task BuscarYAgregarPrimeroAsync()
+    {
+        if (string.IsNullOrWhiteSpace(TxtBuscarArt.Text))
+            return;
+        if (CboProveedor.SelectedItem is not ProveedorSimple prov)
+        {
+            MessageBox.Show("Seleccione primero un proveedor.");
+            return;
+        }
+
+        try
+        {
+            var encontrados = await App.Api.ListarArticulosProveedor(prov.Id, buscar: TxtBuscarArt.Text.Trim(), pageSize: 30);
+            if (encontrados.Count == 0)
+            {
+                MessageBox.Show("No hay artículos de ese proveedor que coincidan con la búsqueda.");
+                return;
+            }
+
+            if (encontrados.Count > 1)
+                MessageBox.Show($"Se encontraron {encontrados.Count} coincidencias. Se agrega el primero; refine la búsqueda o elija desde el catálogo.", "Varios resultados", MessageBoxButton.OK, MessageBoxImage.Information);
+
+            AgregarDesdeArticulo(encontrados[0]);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error: {ex.Message}");
+        }
+    }
+
+    private void LstCatalogo_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (LstCatalogo.SelectedItem is Articulo art)
+            AgregarDesdeArticulo(art);
+    }
+
+    private void BtnAgregarSeleccion_Click(object sender, RoutedEventArgs e)
+    {
+        if (LstCatalogo.SelectedItem is Articulo art)
+            AgregarDesdeArticulo(art);
+        else
+            MessageBox.Show("Seleccione un artículo en el catálogo.");
+    }
+
+    private void AgregarDesdeArticulo(Articulo art)
+    {
+        if (CboProveedor.SelectedItem is not ProveedorSimple provSelected)
+        {
+            MessageBox.Show("Seleccione un proveedor.");
+            return;
+        }
+
+        if (art.IdProveedor != provSelected.Id)
+        {
+            MessageBox.Show("El artículo no pertenece al proveedor seleccionado.");
+            return;
+        }
+
+        var cant = decimal.TryParse(TxtCant.Text, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.CurrentCulture, out var c) ? c : 1m;
+        var costoDef = art.PrecioCosto;
+        var costo = decimal.TryParse(TxtCosto.Text, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.CurrentCulture, out var co) ? co : costoDef;
+
+        var existente = _items.FirstOrDefault(x => x.IdArticulo == art.Id);
+        if (existente != null)
+        {
+            existente.CantidadPedida += cant;
+            DgDetalle.Items.Refresh();
+            TxtBuscarArt.Clear();
+            return;
+        }
+
+        _items.Add(OcLineItem.FromArticulo(ActualizarTotal, art, cant, costo));
+
+        TxtBuscarArt.Clear();
+        TxtCant.Text = "1";
+        TxtCosto.Clear();
+    }
+
+    private void BtnQuitar_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as Button)?.Tag is OcLineItem item)
+            _items.Remove(item);
+    }
+
+    private void ActualizarTotal()
+    {
+        var total = _items.Sum(i => i.Subtotal);
+        TxtTotal.Text = total.ToString("C2", CultureInfo.CurrentCulture);
+        var uds = _items.Sum(i => i.CantidadPedida);
+        if (_items.Count == 0)
+        {
+            TxtResumenLineas.Text = "0 artículos (sin líneas)";
+            return;
+        }
+
+        var n = _items.Count == 1 ? "1 línea" : $"{_items.Count} líneas";
+        TxtResumenLineas.Text = $"{n} · {FormatQty(uds)} uds. · {total.ToString("C2", CultureInfo.CurrentCulture)}";
+    }
+
+    private static string FormatQty(decimal q)
+        => q == Math.Truncate(q) ? ((int)q).ToString(CultureInfo.CurrentCulture) : q.ToString("0.##", CultureInfo.CurrentCulture);
+
+    private async void BtnGuardar_Click(object sender, RoutedEventArgs e)
+    {
+        if (CboProveedor.SelectedItem is not ProveedorSimple prov)
+        {
+            MessageBox.Show("Seleccione un proveedor.");
+            return;
+        }
+
+        if (_items.Count == 0)
+        {
+            MessageBox.Show("Agregue al menos un artículo.");
+            return;
+        }
+
+        try
+        {
+            var oc = new OrdenCompra
+            {
+                IdProveedor = prov.Id,
+                IdUsuario = App.UsuarioSession?.Id ?? App.IdUsuarioActual,
+                FechaEntregaEsperada = DpEntrega.SelectedDate?.ToUniversalTime(),
+                Estado = _iaLineas is { Count: > 0 } ? EstadoOrdenCompra.Borrador : EstadoOrdenCompra.Pendiente,
+                Detalles = _items.Select(i => new OrdenCompraDetalle
+                {
+                    IdArticulo = i.IdArticulo,
+                    CantidadPedida = i.CantidadPedida,
+                    PrecioCosto = i.PrecioCosto,
+                    AlicuotaIva = i.AlicuotaIva,
+                    Subtotal = i.Subtotal,
+                    CantidadRecibida = 0
+                }).ToList()
+            };
+            await App.Api.CrearOrdenCompra(oc);
+            MessageBox.Show("Orden de compra creada.", "OK");
+            DialogResult = true;
+            Close();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error: {ex.Message}");
+        }
+    }
+
+    private void BtnCancelar_Click(object sender, RoutedEventArgs e)
+    {
+        DialogResult = false;
+        Close();
+    }
+
+    private void DgDetalle_PreparingCellForEdit(object sender, DataGridPreparingCellForEditEventArgs e)
+    {
+        if (e.EditingElement is TextBox tb)
+        {
+            tb.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                tb.SelectAll();
+                tb.Focus();
+            }));
+        }
+    }
+
+    private void DgDetalle_BeginningEdit(object sender, DataGridBeginningEditEventArgs e)
+    {
+        if (e.Row.Item is not OcLineItem)
+            e.Cancel = true;
+    }
+
+    private void DgDetalle_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
+    {
+        if (e.EditAction != DataGridEditAction.Commit)
+            return;
+        if (e.Row?.Item is not OcLineItem line)
+            return;
+        if (e.EditingElement is not TextBox tb)
+            return;
+
+        var header = e.Column.Header?.ToString() ?? string.Empty;
+        if (header is not "Cantidad" and not "Costo unit." and not "IVA %")
+            return;
+
+        var text = (tb.Text ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(text))
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        if (!decimal.TryParse(text, NumberStyles.Any, CultureInfo.CurrentCulture, out var parsed))
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        if (header == "Cantidad")
+        {
+            if (parsed <= 0)
+            {
+                e.Cancel = true;
+                return;
+            }
+
+            line.CantidadPedida = Math.Round(parsed, 4, MidpointRounding.AwayFromZero);
+        }
+        else if (header == "Costo unit.")
+        {
+            if (parsed < 0)
+            {
+                e.Cancel = true;
+                return;
+            }
+
+            line.PrecioCosto = Math.Round(parsed, 4, MidpointRounding.AwayFromZero);
+        }
+        else
+        {
+            if (parsed < 0)
+            {
+                e.Cancel = true;
+                return;
+            }
+
+            line.AlicuotaIva = Math.Round(parsed, 2, MidpointRounding.AwayFromZero);
+        }
+    }
+
+    /// <summary>Línea de OC con descripción para mostrar en la grilla (la entidad no incluye texto).</summary>
+    private sealed class OcLineItem : INotifyPropertyChanged
+    {
+        private readonly Action _onTotals;
+
+        public OcLineItem(Action onTotals) => _onTotals = onTotals;
+
+        public int IdArticulo { get; set; }
+        public string Descripcion { get; set; } = "";
+        public string CodigoBarras { get; set; } = "";
+
+        private decimal _cantidadPedida;
+        public decimal CantidadPedida
+        {
+            get => _cantidadPedida;
+            set
+            {
+                var v = value <= 0 ? 0.0001m : value;
+                v = Math.Round(v, 4, MidpointRounding.AwayFromZero);
+                if (_cantidadPedida == v) return;
+                _cantidadPedida = v;
+                OnPropertyChanged();
+                RecomputeSubtotal();
+            }
+        }
+
+        private decimal _precioCosto;
+        public decimal PrecioCosto
+        {
+            get => _precioCosto;
+            set
+            {
+                var v = value < 0 ? 0 : value;
+                v = Math.Round(v, 4, MidpointRounding.AwayFromZero);
+                if (_precioCosto == v) return;
+                _precioCosto = v;
+                OnPropertyChanged();
+                RecomputeSubtotal();
+            }
+        }
+
+        private decimal _alicuotaIva;
+        public decimal AlicuotaIva
+        {
+            get => _alicuotaIva;
+            set
+            {
+                var v = value < 0 ? 0 : value;
+                v = Math.Round(v, 2, MidpointRounding.AwayFromZero);
+                if (_alicuotaIva == v) return;
+                _alicuotaIva = v;
+                OnPropertyChanged();
+            }
+        }
+
+        private decimal _subtotal;
+        public decimal Subtotal
+        {
+            get => _subtotal;
+            private set
+            {
+                if (_subtotal == value) return;
+                _subtotal = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        public void InitializeFromIa(NuevaOCLineaInicial l)
+        {
+            IdArticulo = l.IdArticulo;
+            Descripcion = l.Descripcion;
+            CodigoBarras = l.CodigoBarras;
+            _cantidadPedida = l.CantidadPedida <= 0 ? 0.0001m : l.CantidadPedida;
+            _precioCosto = l.PrecioCosto < 0 ? 0 : l.PrecioCosto;
+            _alicuotaIva = l.AlicuotaIva;
+            RecomputeSubtotal();
+            OnPropertyChanged(nameof(CantidadPedida));
+            OnPropertyChanged(nameof(PrecioCosto));
+            OnPropertyChanged(nameof(AlicuotaIva));
+        }
+
+        public static OcLineItem FromArticulo(Action onTotals, Articulo art, decimal cant, decimal costo)
+        {
+            var o = new OcLineItem(onTotals)
+            {
+                IdArticulo = art.Id,
+                Descripcion = art.Descripcion,
+                CodigoBarras = art.CodigoBarras
+            };
+            o._alicuotaIva = art.AlicuotaIva;
+            o._precioCosto = costo < 0 ? 0 : Math.Round(costo, 4, MidpointRounding.AwayFromZero);
+            o._cantidadPedida = cant <= 0 ? 0.0001m : Math.Round(cant, 4, MidpointRounding.AwayFromZero);
+            o.RecomputeSubtotal();
+            o.OnPropertyChanged(nameof(CantidadPedida));
+            o.OnPropertyChanged(nameof(PrecioCosto));
+            o.OnPropertyChanged(nameof(AlicuotaIva));
+            return o;
+        }
+
+        private void RecomputeSubtotal()
+        {
+            Subtotal = Math.Round(_cantidadPedida * _precioCosto, 2, MidpointRounding.AwayFromZero);
+            _onTotals();
+        }
+
+        private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+}

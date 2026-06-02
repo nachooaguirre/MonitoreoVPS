@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SuperPOS Mobile Portal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="app.css?v=6">
+    <link rel="manifest" href="manifest.json?v=6">
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('PWA Service Worker registered', reg))
+                    .catch(err => console.warn('PWA Service Worker registration failed', err));
+            });
+        }
+    </script>
+</head>
+<body>
+    <div id="app">
+        <!-- ===== ENCABEZADO ===== -->
+        <header>
+            <div class="header-content">
+                <span class="logo">⚡ SuperPOS Mobile</span>
+                <span id="txt-status" class="status-badge online">Conectado</span>
+            </div>
+        </header>
+
+        <!-- ===== MENÚ PRINCIPAL ===== -->
+        <main id="view-menu" class="view active">
+            <h2 class="section-title">Terminal de Depósito y Salón</h2>
+            <p class="section-desc">Seleccioná la operación a realizar con tu terminal Zebra</p>
+            
+            <div class="menu-grid">
+                <button class="menu-card" onclick="switchView('view-inventario')">
+                    <span class="menu-icon">📦</span>
+                    <span class="menu-title">Conteo de Stock</span>
+                    <span class="menu-desc">Registrar existencias de salón o depósito</span>
+                </button>
+
+                <button class="menu-card" onclick="switchView('view-recepcion')">
+                    <span class="menu-icon">🚚</span>
+                    <span class="menu-title">Recepción de Camión</span>
+                    <span class="menu-desc">Controlar remitos contra orden de compra</span>
+                </button>
+
+                <button class="menu-card" onclick="switchView('view-etiquetas')">
+                    <span class="menu-icon">🏷️</span>
+                    <span class="menu-title">Encolar Etiquetas</span>
+                    <span class="menu-desc">Escanear para imprimir etiquetas de góndola</span>
+                </button>
+
+                <button class="menu-card" onclick="switchView('view-ingreso-stock')">
+                    <span class="menu-icon">➕</span>
+                    <span class="menu-title">Agregar al Stock</span>
+                    <span class="menu-desc">Incrementar existencias de un producto</span>
+                </button>
+            </div>
+        </main>
+
+        <!-- ===== VISTA: CONTEO DE INVENTARIO ===== -->
+        <main id="view-inventario" class="view">
+            <div class="view-header">
+                <button class="btn-back" onclick="switchView('view-menu')">← Volver</button>
+                <h3>📦 Conteo de Stock</h3>
+            </div>
+
+            <!-- Selección de Inventario Abierto -->
+            <div id="step-inv-select" class="card">
+                <h4>Seleccioná un inventario activo</h4>
+                <div id="list-inventarios" class="list-group">
+                    <p class="loading">Cargando inventarios...</p>
+                </div>
+            </div>
+
+            <!-- Flujo de Conteo -->
+            <div id="step-inv-scan" class="card hidden">
+                <div class="active-session-info">
+                    <span id="lbl-inv-name">Inventario General</span>
+                    <button class="btn-text-danger" onclick="abandonarSesionInventario()">Cambiar</button>
+                </div>
+
+                <div class="scanner-input-container">
+                    <label for="txt-inv-barcode">Escanear Producto</label>
+                    <div class="input-with-button">
+                        <input type="text" id="txt-inv-barcode" placeholder="Escanear código EAN..." autocomplete="off">
+                        <button class="btn-camera" onclick="toggleCameraScanner('reader-inv', 'txt-inv-barcode')">📷</button>
+                    </div>
+                    <div id="reader-inv" class="camera-reader hidden"></div>
+                </div>
+
+                <!-- Info del Artículo Escaneado -->
+                <div id="inv-article-info" class="scanned-info-card hidden">
+                    <h4 id="lbl-inv-art-desc">AMANDA YERBA 1KG</h4>
+                    <div class="art-grid-info">
+                        <div>
+                            <span class="lbl-small">EAN</span>
+                            <span id="lbl-inv-art-ean" class="val-bold">779271000001</span>
+                        </div>
+                        <div>
+                            <span class="lbl-small">Stock Sistema</span>
+                            <span id="lbl-inv-art-stock" class="val-bold">12.00</span>
+                        </div>
+                    </div>
+
+                    <div class="counter-control">
+                        <label>Cantidad Contada</label>
+                        <div class="input-spinner">
+                            <button class="btn-spinner" onclick="adjustCount(-1)">-</button>
+                            <input type="number" id="num-inv-qty" value="1" step="any">
+                            <button class="btn-spinner" onclick="adjustCount(1)">+</button>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="btn-primary" onclick="guardarConteo(true)">Sumar al Conteo</button>
+                        <button class="btn-secondary" onclick="guardarConteo(false)">Fijar Cantidad</button>
+                    </div>
+                </div>
+
+                <div id="inv-scan-hint" class="scan-hint">
+                    📱 Apuntá y presioná el gatillo de tu Zebra para escanear
+                </div>
+            </div>
+        </main>
+
+        <!-- ===== VISTA: RECEPCIÓN DE CAMIÓN (OC) ===== -->
+        <main id="view-recepcion" class="view">
+            <div class="view-header">
+                <button class="btn-back" onclick="switchView('view-menu')">← Volver</button>
+                <h3>🚚 Recepción vs. Orden de Compra</h3>
+            </div>
+
+            <!-- Selección de Orden de Compra -->
+            <div id="step-oc-select" class="card">
+                <h4>Seleccioná la Orden de Compra</h4>
+                <div id="list-ocs" class="list-group">
+                    <p class="loading">Cargando órdenes de compra...</p>
+                </div>
+            </div>
+
+            <!-- Escaneo e Inspección -->
+            <div id="step-oc-control" class="card hidden">
+                <div class="active-session-info">
+                    <span id="lbl-oc-name">OC Nro 123 - Distribuidora S.</span>
+                    <button class="btn-text-danger" onclick="abandonarSesionOC()">Cambiar</button>
+                </div>
+
+                <div class="scanner-input-container">
+                    <label for="txt-oc-barcode">Escanear Artículo Recibido</label>
+                    <div class="input-with-button">
+                        <input type="text" id="txt-oc-barcode" placeholder="Escanear EAN..." autocomplete="off">
+                        <button class="btn-camera" onclick="toggleCameraScanner('reader-oc', 'txt-oc-barcode')">📷</button>
+                    </div>
+                    <div id="reader-oc" class="camera-reader hidden"></div>
+                </div>
+
+                <!-- Detalle de la OC y Progreso -->
+                <div class="oc-items-list-container">
+                    <div class="list-header">
+                        <span>Detalle de Recepción</span>
+                        <span id="lbl-oc-progress">0/0 ítems</span>
+                    </div>
+                    <div id="list-oc-items" class="oc-items-scroll">
+                        <!-- Items de la OC -->
+                    </div>
+                </div>
+
+                <button class="btn-primary btn-block" onclick="finalizarRecepcionOC()">Confirmar Recepción e Ingresar Stock</button>
+            </div>
+        </main>
+
+        <!-- ===== VISTA: ENCOLAR ETIQUETAS ===== -->
+        <main id="view-etiquetas" class="view">
+            <div class="view-header">
+                <button class="btn-back" onclick="switchView('view-menu')">← Volver</button>
+                <h3>🏷️ Encolar Etiquetas</h3>
+            </div>
+
+            <div class="card">
+                <div class="scanner-input-container">
+                    <label for="txt-lbl-barcode">Escanear Artículo para Góndola</label>
+                    <div class="input-with-button">
+                        <input type="text" id="txt-lbl-barcode" placeholder="Escanear código EAN..." autocomplete="off">
+                        <button class="btn-camera" onclick="toggleCameraScanner('reader-lbl', 'txt-lbl-barcode')">📷</button>
+                    </div>
+                    <div id="reader-lbl" class="camera-reader hidden"></div>
+                </div>
+
+                <div id="lbl-article-info" class="scanned-info-card hidden">
+                    <!-- Vista Previa de la Etiqueta de Góndola Real -->
+                    <div class="ticket-preview">
+                        <div class="ticket-store">LOS ANGELES SUPERMERCADOS</div>
+                        <div class="ticket-title" id="ticket-art-desc">AMANDA YERBA 1KG</div>
+                        <div class="ticket-middle">
+                            <div class="ticket-price-container">
+                                <span class="ticket-currency">$</span>
+                                <span class="ticket-price-whole" id="ticket-price-whole">0</span>
+                                <span class="ticket-price-decimal" id="ticket-price-decimal">.00</span>
+                            </div>
+                        </div>
+                        <div class="ticket-footer">
+                            <div class="ticket-barcode-container" id="ticket-barcode-svg"></div>
+                            <div class="ticket-meta">
+                                <div class="ticket-date" id="ticket-date-str">01/06/2026</div>
+                                <div class="ticket-code-internal" id="ticket-code-internal">INT: 00000</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="counter-control">
+                        <label>Cantidad de Etiquetas</label>
+                        <div class="input-spinner">
+                            <button class="btn-spinner" onclick="adjustLabelQty(-1)">-</button>
+                            <input type="number" id="num-label-qty" value="1">
+                            <button class="btn-spinner" onclick="adjustLabelQty(1)">+</button>
+                        </div>
+                    </div>
+
+                    <button class="btn-primary btn-block" onclick="encolarEtiquetaApi()">Agregar a Cola de Impresión</button>
+                </div>
+
+                <div id="lbl-scan-hint" class="scan-hint">
+                    📱 Escaneá artículos en la góndola para encolar sus etiquetas si el precio cambió o la etiqueta está dañada.
+                </div>
+            </div>
+        </main>
+
+        <!-- ===== VISTA: AGREGAR AL STOCK ===== -->
+        <main id="view-ingreso-stock" class="view">
+            <div class="view-header">
+                <button class="btn-back" onclick="switchView('view-menu')">← Volver</button>
+                <h3>➕ Agregar al Stock</h3>
+            </div>
+
+            <div class="card">
+                <div class="scanner-input-container">
+                    <label for="txt-stock-barcode">Escanear Producto</label>
+                    <div class="input-with-button">
+                        <input type="text" id="txt-stock-barcode" placeholder="Escanear código EAN..." autocomplete="off">
+                        <button class="btn-camera" onclick="toggleCameraScanner('reader-stock', 'txt-stock-barcode')">📷</button>
+                    </div>
+                    <div id="reader-stock" class="camera-reader hidden"></div>
+                </div>
+
+                <div id="stock-article-info" class="scanned-info-card hidden">
+                    <h4 id="lbl-stock-art-desc">YERBA AMANDA 1KG</h4>
+                    <div class="art-grid-info">
+                        <div>
+                            <span class="lbl-small">Código EAN</span>
+                            <span id="lbl-stock-art-ean" class="val-bold">779271000001</span>
+                        </div>
+                        <div>
+                            <span class="lbl-small">Stock Actual</span>
+                            <span id="lbl-stock-art-current" class="val-bold">12.00</span>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 10px;">
+                        <label for="sel-stock-sucursal">Sucursal / Depósito</label>
+                        <select id="sel-stock-sucursal">
+                            <option value="">Cargando sucursales...</option>
+                        </select>
+                    </div>
+
+                    <div class="counter-control" style="margin-top: 10px;">
+                        <label>Cantidad a Agregar</label>
+                        <div class="input-spinner">
+                            <button class="btn-spinner" onclick="adjustStockAddQty(-1)">-</button>
+                            <input type="number" id="num-stock-qty" value="1" step="any">
+                            <button class="btn-spinner" onclick="adjustStockAddQty(1)">+</button>
+                        </div>
+                    </div>
+
+                    <button class="btn-primary btn-block" onclick="guardarIngresoStockDirecto()">Confirmar Ingreso de Stock</button>
+                </div>
+
+                <div id="stock-scan-hint" class="scan-hint">
+                    📱 Escaneá artículos para incrementar sus existencias directamente en la sucursal seleccionada.
+                </div>
+            </div>
+        </main>
+
+        <!-- ===== MODAL: CREAR NUEVO ARTÍCULO ===== -->
+        <div id="modal-nuevo-articulo" class="modal-backdrop hidden">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <h4>🆕 Crear Nuevo Artículo</h4>
+                    <button class="btn-close-modal" onclick="cerrarModalNuevoArticulo()">×</button>
+                </div>
+                <div class="modal-body">
+                    <form id="form-nuevo-articulo" onsubmit="guardarNuevoArticulo(event)">
+                        <div class="form-group">
+                            <label for="new-art-ean">Código de Barras</label>
+                            <input type="text" id="new-art-ean" readonly class="input-readonly">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="new-art-desc">Descripción *</label>
+                            <input type="text" id="new-art-desc" required placeholder="Ej. YERBA AMANDA 1KG">
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="new-art-costo">Precio Costo ($)</label>
+                                <input type="number" id="new-art-costo" step="any" min="0" value="0.00">
+                            </div>
+                            <div class="form-group">
+                                <label for="new-art-venta">Precio Venta ($)</label>
+                                <input type="number" id="new-art-venta" step="any" min="0" value="0.00">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="new-art-stock">Stock Inicial</label>
+                                <input type="number" id="new-art-stock" step="any" value="1.00">
+                            </div>
+                            <div class="form-group">
+                                <label for="new-art-proveedor">Proveedor *</label>
+                                <select id="new-art-proveedor" required>
+                                    <option value="">Cargando...</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="new-art-depto">Departamento *</label>
+                            <select id="new-art-depto" required onchange="onDepartamentoChanged()">
+                                <option value="">Cargando...</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="new-art-familia">Familia *</label>
+                            <select id="new-art-familia" required>
+                                <option value="">Seleccioná depto primero...</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="new-art-marca">Marca *</label>
+                            <select id="new-art-marca" required>
+                                <option value="">Cargando...</option>
+                            </select>
+                        </div>
+
+                        <div class="modal-actions">
+                            <button type="button" class="btn-secondary" onclick="cerrarModalNuevoArticulo()">Cancelar</button>
+                            <button type="submit" class="btn-primary">Crear Artículo</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Notifications -->
+        <div id="toast-container"></div>
+    </div>
+    <script src="app.js?v=6"></script>
+</body>
+</html>

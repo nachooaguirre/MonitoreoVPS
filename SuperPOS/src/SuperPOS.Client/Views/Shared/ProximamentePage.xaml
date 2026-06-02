@@ -1,0 +1,12 @@
+<Page x:Class="SuperPOS.Client.Views.Shared.ProximamentePage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    <Grid>
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+            <TextBlock Text="🚧" FontSize="64" HorizontalAlignment="Center" Margin="0,0,0,16"/>
+            <TextBlock x:Name="TxtModulo" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+            <TextBlock Text="Módulo en desarrollo" FontSize="16" Opacity="0.5" HorizontalAlignment="Center"/>
+        </StackPanel>
+    </Grid>
+</Page>

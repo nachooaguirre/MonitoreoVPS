@@ -1,0 +1,16 @@
+# Ignorar carpetas incrustadas
+IDR/
+
+# Ignorar archivos temporales y compilaciones de C# / .NET
+**/bin/
+**/obj/
+.vs/
+.idea/
+*.user
+
+# Ignorar bases de datos locales y backups pesados
+*.Mdb
+*.zip
+descompilado/
+LA - Supermer*/
+LoginMarketNewAge*/
