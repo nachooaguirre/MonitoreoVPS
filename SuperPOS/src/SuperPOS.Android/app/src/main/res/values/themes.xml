@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Theme.SuperPOS" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Primary brand color. -->
+        <item name="colorPrimary">#60CDFF</item>
+        <item name="colorPrimaryVariant">#0078D4</item>
+        <item name="colorOnPrimary">#000000</item>
+        <!-- Secondary brand color. -->
+        <item name="colorSecondary">#202020</item>
+        <item name="colorSecondaryVariant">#171717</item>
+        <item name="colorOnSecondary">#FFFFFF</item>
+        <!-- Status bar color. -->
+        <item name="android:statusBarColor">#1F1F1F</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

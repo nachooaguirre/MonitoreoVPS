@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    width="108dp"
+    height="108dp"
+    viewportWidth="108"
+    viewportHeight="108">
+    <!-- Barcode bars in background of logo -->
+    <path
+        android:fillColor="#3360CDFF"
+        android:pathData="M24,20h4v68h-4z M32,20h2v68h-2z M38,20h6v68h-6z M48,20h2v68h-2z M54,20h4v68h-4z M62,20h8v68h-8z M74,20h2v68h-2z M80,20h4v68h-4z" />
+    <!-- POS / Shopping Cart Icon in center -->
+    <path
+        android:fillColor="#60CDFF"
+        android:pathData="M35,35h8l10,24h18l8-15H47" />
+    <path
+        android:fillColor="#0078D4"
+        android:pathData="M51,66m-4,0a4,4 0,1 1,8 0a4,4 0,1 1,-8 0" />
+    <path
+        android:fillColor="#0078D4"
+        android:pathData="M69,66m-4,0a4,4 0,1 1,8 0a4,4 0,1 1,-8 0" />
+</vector>
