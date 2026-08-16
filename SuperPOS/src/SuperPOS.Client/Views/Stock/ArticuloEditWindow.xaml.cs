@@ -13,6 +13,7 @@ public partial class ArticuloEditWindow : Wpf.Ui.Controls.FluentWindow
 {
     private readonly Articulo? _original;
     private bool _calculando;
+    private int? _idArticuloPadre;
 
     public ArticuloEditWindow(Articulo? articulo)
     {
@@ -65,6 +66,8 @@ public partial class ArticuloEditWindow : Wpf.Ui.Controls.FluentWindow
             CmbDepto.SelectedValue = _original.IdDepartamento;
             CmbMarca.SelectedValue = _original.IdMarca;
             CmbProveedor.SelectedValue = _original.IdProveedor > 0 ? _original.IdProveedor : provs.FirstOrDefault()?.Id;
+            TxtContenidoValor.Text = _original.ContenidoValor.ToString("G");
+            SetContenidoUnidad(_original.ContenidoUnidad);
 
             // Cargar bonificaciones, recargos e impuesto interno
             TxtBonif1.Text = _original.Bonificacion1 > 0 ? _original.Bonificacion1.ToString("G") : "";
@@ -80,6 +83,18 @@ public partial class ArticuloEditWindow : Wpf.Ui.Controls.FluentWindow
             CmbFamilia.SelectedValue = _original.IdFamilia;
             BtnHistorial.Visibility = Visibility.Visible;
             BtnPromociones.Visibility = Visibility.Visible;
+
+            // Cargar relación con artículo padre
+            _idArticuloPadre = _original.IdArticuloPadre;
+            TxtMultiplicador.Text = _original.MultiplicadorStock.ToString("G");
+            if (_idArticuloPadre.HasValue)
+            {
+                var padre = await App.Api.GetArticulo(_idArticuloPadre.Value);
+                if (padre != null)
+                {
+                    TxtProductoPadre.Text = padre.Descripcion;
+                }
+            }
         }
         else
         {
@@ -95,7 +110,12 @@ public partial class ArticuloEditWindow : Wpf.Ui.Controls.FluentWindow
             TxtBonif5.Text = "";
             TxtRecargo1.Text = "";
             TxtImpuestoInterno.Text = "";
+            _idArticuloPadre = null;
+            TxtMultiplicador.Text = "1";
+            TxtContenidoValor.Text = "1";
+            CmbContenidoUnidad.SelectedIndex = 0;
         }
+        CalcularPrecioReferencia();
     }
 
     private void SetIva(decimal alicuota)
@@ -172,6 +192,7 @@ public partial class ArticuloEditWindow : Wpf.Ui.Controls.FluentWindow
             // Actualizar etiquetas de totales
             if (LblBonifTotal != null) LblBonifTotal.Text = $"{bonifTotalPorc:N2} %";
             if (LblRecargoTotal != null) LblRecargoTotal.Text = $"{recargoTotalPorc:N2} %";
+            CalcularPrecioReferencia();
         }
         catch (Exception) { /* Ignorar errores temporales */ }
         finally { _calculando = false; }
@@ -224,6 +245,7 @@ public partial class ArticuloEditWindow : Wpf.Ui.Controls.FluentWindow
                     decimal margen = ((precioVentaSinIva / costoNeto) - 1) * 100;
                     TxtMargen.Text = margen.ToString("N2");
                 }
+                CalcularPrecioReferencia();
             }
         }
         catch (Exception) { /* Ignorar errores temporales */ }
@@ -263,6 +285,9 @@ public partial class ArticuloEditWindow : Wpf.Ui.Controls.FluentWindow
         decimal.TryParse(TxtRecargo1.Text.Replace(',', '.'), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var recargo1);
         decimal.TryParse(TxtImpuestoInterno.Text.Replace(',', '.'), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var impInterno);
 
+        decimal.TryParse(TxtMultiplicador.Text.Replace(',', '.'), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var multiplicador);
+        if (multiplicador <= 0) multiplicador = 1;
+
         var art = _original ?? new Articulo();
         art.Descripcion = TxtDescripcion.Text.Trim();
         art.CodigoBarras = TxtEAN.Text.Trim();
@@ -280,6 +305,8 @@ public partial class ArticuloEditWindow : Wpf.Ui.Controls.FluentWindow
         art.ImpuestoInterno = impInterno;
         art.AlicuotaIva = GetIvaSeleccionado();
         art.AplicaIva = ChkAplicaIva.IsChecked == true;
+        art.IdArticuloPadre = _idArticuloPadre;
+        art.MultiplicadorStock = multiplicador;
         art.UnidadesPorBulto = uxb;
         art.CajasPorBulto = cxb;
         art.StockActual = stock;
@@ -287,6 +314,9 @@ public partial class ArticuloEditWindow : Wpf.Ui.Controls.FluentWindow
         art.StockMaximo = stockMax;
         art.EsPesable = ChkPesable.IsChecked == true;
         art.Activo = ChkActivo.IsChecked == true;
+        decimal.TryParse(TxtContenidoValor.Text.Replace(',', '.'), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var contVal);
+        art.ContenidoValor = contVal > 0 ? contVal : 1m;
+        art.ContenidoUnidad = (CmbContenidoUnidad.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "UN";
         art.RequiereNroLote = ChkRequiereLote.IsChecked == true;
         art.RequiereFechaVencimiento = ChkRequiereVenc.IsChecked == true;
         art.RequiereNroSerie = ChkRequiereSerie.IsChecked == true;
@@ -366,5 +396,97 @@ public partial class ArticuloEditWindow : Wpf.Ui.Controls.FluentWindow
         if (_original is null) return;
         var win = new BonificacionesFechasWindow(_original) { Owner = this };
         win.ShowDialog();
+    }
+
+    private void BtnBuscarPadre_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new Caja.BuscadorArticulosWindow("") { Owner = this };
+        if (dlg.ShowDialog() == true && dlg.ArticuloSeleccionado != null)
+        {
+            if (_original != null && dlg.ArticuloSeleccionado.Id == _original.Id)
+            {
+                MessageBox.Show("Un artículo no puede ser su propio producto principal.", "Validación", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            _idArticuloPadre = dlg.ArticuloSeleccionado.Id;
+            TxtProductoPadre.Text = dlg.ArticuloSeleccionado.Descripcion;
+        }
+    }
+
+    private void BtnLimpiarPadre_Click(object sender, RoutedEventArgs e)
+    {
+        _idArticuloPadre = null;
+        TxtProductoPadre.Text = "";
+        TxtMultiplicador.Text = "1";
+    }
+
+    private void SetContenidoUnidad(string unidad)
+    {
+        if (CmbContenidoUnidad == null) return;
+        foreach (ComboBoxItem item in CmbContenidoUnidad.Items)
+        {
+            if (item.Tag?.ToString() == unidad)
+            {
+                CmbContenidoUnidad.SelectedItem = item;
+                return;
+            }
+        }
+        CmbContenidoUnidad.SelectedIndex = 0; // default UN
+    }
+
+    private void Contenido_Changed(object sender, object e)
+    {
+        CalcularPrecioReferencia();
+    }
+
+    private void CalcularPrecioReferencia()
+    {
+        if (LblCalculoPrecioReferencia == null) return;
+
+        try
+        {
+            if (!decimal.TryParse(TxtPrecioVenta.Text.Replace(',', '.'), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var precioVenta) || precioVenta <= 0)
+            {
+                LblCalculoPrecioReferencia.Text = "-";
+                return;
+            }
+
+            if (!decimal.TryParse(TxtContenidoValor.Text.Replace(',', '.'), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var contenidoValor) || contenidoValor <= 0)
+            {
+                LblCalculoPrecioReferencia.Text = "-";
+                return;
+            }
+
+            var unidad = (CmbContenidoUnidad.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "UN";
+
+            if (unidad == "G")
+            {
+                var precioKg = (precioVenta * 1000m) / contenidoValor;
+                LblCalculoPrecioReferencia.Text = $"Kilo: $ {precioKg:N2}";
+            }
+            else if (unidad == "KG")
+            {
+                var precioKg = precioVenta / contenidoValor;
+                LblCalculoPrecioReferencia.Text = $"Kilo: $ {precioKg:N2}";
+            }
+            else if (unidad == "ML")
+            {
+                var precioL = (precioVenta * 1000m) / contenidoValor;
+                LblCalculoPrecioReferencia.Text = $"Litro: $ {precioL:N2}";
+            }
+            else if (unidad == "L")
+            {
+                var precioL = precioVenta / contenidoValor;
+                LblCalculoPrecioReferencia.Text = $"Litro: $ {precioL:N2}";
+            }
+            else
+            {
+                LblCalculoPrecioReferencia.Text = "-";
+            }
+        }
+        catch
+        {
+            LblCalculoPrecioReferencia.Text = "-";
+        }
     }
 }

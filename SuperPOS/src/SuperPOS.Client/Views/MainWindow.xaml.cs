@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using Microsoft.AspNetCore.SignalR.Client;
 using SuperPOS.Client.Models;
 using SuperPOS.Client.Views.Caja;
 using SuperPOS.Client.Views.Clientes;
@@ -21,9 +22,11 @@ using SuperPOS.Client.Views.Reportes;
 using SuperPOS.Client.Views.Stock;
 using SuperPOS.Client.Views.Shared;
 using SuperPOS.Client.Views.Usuarios;
+using SuperPOS.Client.Views.Auditoria;
 using SuperPOS.Client.Views.Ai;
 using SuperPOS.Client.Views.Presupuestos;
 using SuperPOS.Client.Views.Precios;
+using SuperPOS.Client.Views.Ofertas;
 
 namespace SuperPOS.Client.Views;
 
@@ -32,6 +35,12 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     private readonly DispatcherTimer _stockTimer;
     private string? _firmaStockBajo;
     private List<ArticuloStockDto> _alertas = [];
+    private HubConnection? _posHub;
+
+    private bool _esPantallaCompleta;
+    private WindowStyle _savedWindowStyle;
+    private WindowState _savedWindowState;
+    private ResizeMode _savedResizeMode;
 
     public MainWindow(string usuario)
     {
@@ -41,7 +50,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         _stockTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(90) };
         _stockTimer.Tick += async (_, _) => await ConsultarAlertasStockAsync();
         Loaded += OnMainWindowLoaded;
-        Closed += (_, _) => _stockTimer.Stop();
+        Closed += (_, _) => { _stockTimer.Stop(); _ = _posHub?.DisposeAsync(); };
         AplicarPermisos();
     }
 
@@ -52,6 +61,30 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         {
             _stockTimer.Start();
             _ = ConsultarAlertasStockAsync();
+        }
+        _ = ConectarPosHubAsync();
+    }
+
+    /// <summary>Conecta al hub SignalR de la API para recibir avisos en tiempo real (venta realizada, stock bajo).</summary>
+    private async Task ConectarPosHubAsync()
+    {
+        try
+        {
+            _posHub = new HubConnectionBuilder()
+                .WithUrl($"{App.ApiBaseUrl}/hubs/pos")
+                .WithAutomaticReconnect()
+                .Build();
+
+            _posHub.On<int, decimal, System.DateTime>("VentaRealizada", (_, _, _) =>
+                Dispatcher.InvokeAsync(RefrescarAlertasStock));
+            _posHub.On<int, string, decimal>("StockBajo", (_, _, _) =>
+                Dispatcher.InvokeAsync(RefrescarAlertasStock));
+
+            await _posHub.StartAsync();
+        }
+        catch
+        {
+            /* API sin SignalR disponible; la campana sigue funcionando por polling */
         }
     }
 
@@ -161,10 +194,10 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         var p = App.PerfilActual;
         BtnCaja.IsEnabled          = p.AccesoCaja || p.EsAdministrador;
         BtnArticulos.IsEnabled     = p.AccesoArticulos || p.EsAdministrador;
+        BtnOfertas.IsEnabled       = p.AccesoArticulos || p.EsAdministrador;
         BtnClientes.IsEnabled      = p.AccesoClientes || p.EsAdministrador;
         BtnProveedores.IsEnabled   = p.AccesoProveedores || p.EsAdministrador;
         BtnPresupuestos.IsEnabled  = p.AccesoCaja || p.AccesoClientes || p.EsAdministrador;
-        BtnCotizaciones.IsEnabled  = p.AccesoCompras || p.AccesoProveedores || p.EsAdministrador;
         BtnOrdenesCompra.IsEnabled    = p.AccesoCompras || p.EsAdministrador;
         BtnTarifasProveedor.IsEnabled = p.AccesoCompras || p.EsAdministrador;
         BtnEtiquetas.IsEnabled        = p.AccesoStock || p.AccesoArticulos || p.EsAdministrador;
@@ -175,8 +208,10 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         BtnTrazabilidad.IsEnabled  = p.AccesoStock || p.EsAdministrador;
         BtnCtaCte.IsEnabled        = p.AccesoCtaCte || p.EsAdministrador;
         BtnReportes.IsEnabled      = p.AccesoReportes || p.EsAdministrador;
+        BtnContabilidad.IsEnabled  = p.AccesoReportes || p.EsAdministrador;
         BtnConfig.IsEnabled        = p.AccesoConfiguracion || p.EsAdministrador;
         BtnUsuarios.Visibility     = (p.AccesoUsuarios || p.EsAdministrador) ? Visibility.Visible : Visibility.Collapsed;
+        BtnAuditoria.Visibility    = p.EsAdministrador ? Visibility.Visible : Visibility.Collapsed;
 
         var verCampana = p.EsAdministrador || p.AccesoStock || p.AccesoCompras || p.AccesoReportes;
         PanelCampana.Visibility = verCampana ? Visibility.Visible : Visibility.Collapsed;
@@ -198,10 +233,10 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         {
             "caja"          => new CajaPage(),
             "articulos"     => new ArticulosPage(),
+            "ofertas"       => new OfertasPage(),
             "clientes"      => new ClientesPage(),
             "proveedores"   => new ProveedoresPage(),
             "presupuestos"  => new PresupuestosPage(),
-            "cotizaciones"  => new CotizacionesPage(),
             "ordenescompra"   => new OrdenesCompraPage(),
             "tarifasproveedor" => new ListasPrecioProveedorPage(),
             "etiquetas"       => new EtiquetasGondolaPage(),
@@ -212,9 +247,11 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
             "trazabilidad"  => new TrazabilidadPage(),
             "ctacte"        => new CtaCtePage(),
             "reportes"      => new ReportesPage(),
+            "contabilidad"  => new ContabilidadPage(),
             "ai"            => new AiAsistentePage(),
             "configuracion" => new ConfiguracionPage(),
             "usuarios"      => new UsuariosPage(),
+            "auditoria"     => new AuditoriaPage(),
             "logout"        => null,
             _               => new ProximamentePage(destino)
         };
@@ -230,5 +267,45 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         }
 
         if (page is not null) ContentFrame.Navigate(page);
+    }
+
+    public void TogglePantallaCompleta(bool entrar)
+    {
+        if (entrar == _esPantallaCompleta) return;
+        _esPantallaCompleta = entrar;
+
+        if (entrar)
+        {
+            // Guardar estado original
+            _savedWindowStyle = WindowStyle;
+            _savedWindowState = WindowState;
+            _savedResizeMode = ResizeMode;
+
+            // Ocultar barra superior y lateral
+            RowTitleBar.Height = new GridLength(0);
+            GridTitleBar.Visibility = Visibility.Collapsed;
+            GridTitleBar.MinHeight = 0;
+            SidebarBorder.Visibility = Visibility.Collapsed;
+            ColSidebar.Width = new GridLength(0);
+
+            // Ajustar ventana a pantalla completa
+            WindowStyle = WindowStyle.None;
+            ResizeMode = ResizeMode.NoResize;
+            WindowState = WindowState.Maximized;
+        }
+        else
+        {
+            // Restaurar estado original
+            WindowStyle = _savedWindowStyle;
+            ResizeMode = _savedResizeMode;
+            WindowState = _savedWindowState;
+
+            // Mostrar barra superior y lateral
+            RowTitleBar.Height = GridLength.Auto;
+            GridTitleBar.Visibility = Visibility.Visible;
+            GridTitleBar.MinHeight = 32;
+            SidebarBorder.Visibility = Visibility.Visible;
+            ColSidebar.Width = new GridLength(200);
+        }
     }
 }

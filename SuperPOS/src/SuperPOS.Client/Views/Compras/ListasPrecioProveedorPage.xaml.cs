@@ -248,7 +248,19 @@ public partial class ListasPrecioProveedorPage : Page
         try
         {
             var ok = await App.Api.UpdateListaProveedorLinea(line.Id, dto);
-            if (!ok) MessageBox.Show("No se pudo guardar la línea en el servidor.", "Guardar", MessageBoxButton.OK, MessageBoxImage.Warning);
+            if (!ok)
+            {
+                MessageBox.Show("No se pudo guardar la línea en el servidor.", "Guardar", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            else
+            {
+                if (_idListaSeleccionada.HasValue)
+                {
+                    _detalle = await App.Api.GetListaPrecioProveedor(_idListaSeleccionada.Value);
+                    if (_detalle != null)
+                        DgLineas.ItemsSource = _detalle.Lineas.ToList();
+                }
+            }
         }
         catch (Exception ex)
         {

@@ -144,6 +144,7 @@ public class OrdenCompraResumenDto
         3 => "Recibida",
         4 => "Anulada",
         5 => "Borrador",
+        6 => "Devuelta",
         _ => "?"
     };
 }

@@ -1,5 +1,10 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
 using SuperPOS.Client.Views.Clientes;
+using SuperPOS.Client.Views.Caja;
 using SuperPOS.Shared.Entities.Ventas;
 
 namespace SuperPOS.Client.Views.Proveedores;
@@ -7,13 +12,24 @@ namespace SuperPOS.Client.Views.Proveedores;
 public partial class ProveedorEditWindow : Wpf.Ui.Controls.FluentWindow
 {
     private readonly Proveedor? _original;
+    private List<Articulo> _articulosVinculados = [];
 
     public ProveedorEditWindow(Proveedor? proveedor)
     {
         InitializeComponent();
         _original = proveedor;
         TitleBarCtrl.Title = proveedor is null ? "Nuevo Proveedor" : $"Editar: {proveedor.RazonSocial}";
-        if (proveedor is not null) CargarDatos(proveedor);
+        if (proveedor is not null)
+        {
+            CargarDatos(proveedor);
+            TabArticulos.IsEnabled = true;
+            Loaded += async (_, _) => await CargarArticulosVinculadosAsync();
+        }
+        else
+        {
+            TabArticulos.IsEnabled = false;
+            TabArticulos.Header = "Artículos (Guardá primero)";
+        }
     }
 
     private void CargarDatos(Proveedor p)
@@ -31,6 +47,85 @@ public partial class ProveedorEditWindow : Wpf.Ui.Controls.FluentWindow
         TxtDiasPago.Text = p.DiasVencimientoPago.ToString();
         TxtObs.Text = p.Observaciones;
         ChkActivo.IsChecked = p.Activo;
+    }
+
+    private async System.Threading.Tasks.Task CargarArticulosVinculadosAsync()
+    {
+        if (_original is null) return;
+        try
+        {
+            _articulosVinculados = await App.Api.ListarArticulosProveedor(_original.Id) ?? [];
+            TxtBuscarArticulo.Text = "";
+            DgArticulosVinculados.ItemsSource = _articulosVinculados;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error al cargar artículos vinculados: {ex.Message}", "Error");
+        }
+    }
+
+    private void TxtBuscarArticulo_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        var busq = TxtBuscarArticulo.Text.Trim().ToLower();
+        if (string.IsNullOrEmpty(busq))
+        {
+            DgArticulosVinculados.ItemsSource = _articulosVinculados;
+        }
+        else
+        {
+            DgArticulosVinculados.ItemsSource = _articulosVinculados
+                .Where(a => a.Descripcion.ToLower().Contains(busq)
+                         || a.CodigoBarras.Contains(busq)
+                         || a.CodigoInterno.Contains(busq))
+                .ToList();
+        }
+    }
+
+    private async void BtnVincularArticulo_Click(object sender, RoutedEventArgs e)
+    {
+        if (_original is null) return;
+        var dlg = new BuscadorArticulosWindow("") { Owner = this };
+        if (dlg.ShowDialog() == true && dlg.ArticuloSeleccionado is Articulo seleccionado)
+        {
+            try
+            {
+                seleccionado.IdProveedor = _original.Id;
+                await App.Api.ActualizarArticulo(seleccionado);
+                await CargarArticulosVinculadosAsync();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al vincular el artículo: {ex.Message}", "Error");
+            }
+        }
+    }
+
+    private async void BtnDesvincularArticulo_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement fe && fe.DataContext is Articulo art)
+        {
+            if (MessageBox.Show($"¿Desvincular el artículo \"{art.Descripcion}\" de este proveedor?",
+                                "Confirmar Desvinculación", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+            {
+                try
+                {
+                    var fallbackId = 1;
+                    var provs = await App.Api.GetProveedoresLista();
+                    if (provs != null && provs.Any())
+                    {
+                        var first = provs.FirstOrDefault(p => p.Id != _original?.Id);
+                        if (first != null) fallbackId = first.Id;
+                    }
+                    art.IdProveedor = fallbackId;
+                    await App.Api.ActualizarArticulo(art);
+                    await CargarArticulosVinculadosAsync();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error al desvincular el artículo: {ex.Message}", "Error");
+                }
+            }
+        }
     }
 
     private async void BtnGuardar_Click(object sender, RoutedEventArgs e)

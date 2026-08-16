@@ -1,0 +1,39 @@
+<ui:FluentWindow x:Class="SuperPOS.Client.Views.Caja.MercadoPagoQrWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        Title="Cobro Mercado Pago QR"
+        Width="450" Height="540"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ExtendsContentIntoTitleBar="True"
+        Background="#111111">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel HorizontalAlignment="Center" Margin="0,0,0,10">
+            <TextBlock Text="🔵 mercado pago" FontSize="18" FontWeight="Bold" Foreground="#009EE3" HorizontalAlignment="Center"/>
+            <TextBlock Text="Cobro por QR Dinámico" FontSize="12" Foreground="#888888" HorizontalAlignment="Center"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center">
+            <!-- QR Image -->
+            <Border BorderBrush="#222222" BorderThickness="1" Padding="10" Background="White" CornerRadius="8" HorizontalAlignment="Center" Margin="0,0,0,16">
+                <Image x:Name="ImgQr" Width="220" Height="220" Stretch="Uniform"/>
+            </Border>
+
+            <TextBlock x:Name="TxtMonto" Text="Monto: $ 0.00" FontSize="16" FontWeight="Bold" Foreground="#FFFFFF" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+            <TextBlock x:Name="TxtEstado" Text="Esperando escaneo y confirmación de pago del cliente..." FontSize="12" Foreground="#A0A0A0" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" MaxWidth="350"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" Orientation="Vertical" HorizontalAlignment="Center" Margin="0,10,0,0">
+            <!-- Botón para forzar simulación de pago en test/homologación -->
+            <ui:Button x:Name="BtnSimularPago" Content="⚡ Simular Pago Exitoso (Test)" Appearance="Primary" Width="260" Height="36" Click="BtnSimularPago_Click" Margin="0,0,0,8" Foreground="#FFFFFF" Background="#009EE3" BorderBrush="#0086C3"/>
+            <Button x:Name="BtnCancelar" Content="Cancelar Cobro" Width="200" Height="36" Click="BtnCancelar_Click"/>
+        </StackPanel>
+    </Grid>
+</ui:FluentWindow>

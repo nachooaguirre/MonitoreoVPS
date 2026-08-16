@@ -85,6 +85,9 @@
                 <DataGridTextColumn Header="RECIBIDO" Binding="{Binding CantidadRecibida, StringFormat='N0'}" Width="90">
                     <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="Foreground" Value="#40C060"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="HorizontalAlignment" Value="Right"/><Setter Property="Padding" Value="0,0,8,0"/></Style></DataGridTextColumn.ElementStyle>
                 </DataGridTextColumn>
+                <DataGridTextColumn Header="ACLARACIÓN/DIFERENCIA" Binding="{Binding ObservacionDiferencia}" Width="160" IsReadOnly="True">
+                    <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="Foreground" Value="#E0A040"/><Setter Property="VerticalAlignment" Value="Center"/><Setter Property="Padding" Value="8,0"/></Style></DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
                 <DataGridTextColumn Header="COSTO UNIT." Binding="{Binding PrecioCosto, StringFormat='$ #,##0.00'}" Width="110">
                     <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="Foreground" Value="#60A080"/><Setter Property="HorizontalAlignment" Value="Right"/><Setter Property="Padding" Value="0,0,8,0"/></Style></DataGridTextColumn.ElementStyle>
                 </DataGridTextColumn>

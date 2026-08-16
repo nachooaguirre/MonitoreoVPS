@@ -1,0 +1,29 @@
+<ui:FluentWindow x:Class="SuperPOS.Client.Views.Caja.ProcesandoPagoWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        Title="Procesando Pago Integrado"
+        Width="420" Height="260"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ExtendsContentIntoTitleBar="True"
+        Background="#181818">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="💳 Conexión con Postnet" FontSize="16" FontWeight="SemiBold" Foreground="#FFC107" HorizontalAlignment="Center"/>
+
+        <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,15">
+            <!-- WpfUi ProgressRing -->
+            <ui:ProgressRing x:Name="Spinner" IsIndeterminate="True" Width="40" Height="40" Margin="0,0,0,14" Foreground="#FFC107"/>
+            <TextBlock x:Name="TxtMonto" Text="Monto: $ 0.00" FontSize="15" FontWeight="Bold" Foreground="#FFFFFF" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+            <TextBlock x:Name="TxtEstado" Text="Iniciando comunicación con el terminal Ingenico..." FontSize="12" Foreground="#A0A0A0" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center"/>
+        </StackPanel>
+
+        <Button Grid.Row="2" x:Name="BtnCancelar" Content="Cancelar Transacción" HorizontalAlignment="Center" Width="180" Height="36" Click="BtnCancelar_Click"/>
+    </Grid>
+</ui:FluentWindow>

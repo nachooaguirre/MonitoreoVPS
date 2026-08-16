@@ -210,6 +210,74 @@
                         </StackPanel>
                     </StackPanel>
                 </TabItem>
+
+                <!-- Tab: Pagos Integrados -->
+                <TabItem Header="💳  Pagos Integrados">
+                    <StackPanel Margin="0,16,0,0">
+                        <TextBlock Text="Terminal Postnet (Ingenico Lane 3000)" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,10"/>
+                        <Grid Margin="0,0,0,16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Postnet integrado" Margin="0,0,0,4"/>
+                                <CheckBox x:Name="ChkPosnetHabilitado" Content="Habilitar cobros integrados por Postnet"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Puerto COM de Conexión" Margin="0,0,0,4"/>
+                                <ComboBox x:Name="CboPosnetPuerto">
+                                    <ComboBoxItem Content="SIMULADOR"/>
+                                    <ComboBoxItem Content="COM1"/>
+                                    <ComboBoxItem Content="COM2"/>
+                                    <ComboBoxItem Content="COM3"/>
+                                    <ComboBoxItem Content="COM4"/>
+                                    <ComboBoxItem Content="COM5"/>
+                                </ComboBox>
+                            </StackPanel>
+                        </Grid>
+
+                        <TextBlock Text="Mercado Pago QR (In-Store)" FontWeight="SemiBold" FontSize="14" Margin="0,8,0,10"/>
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,0,12">
+                                <TextBlock Text="Mercado Pago QR integrado" Margin="0,0,0,4"/>
+                                <CheckBox x:Name="ChkMpqrHabilitado" Content="Habilitar cobros por QR dinámico"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="0" Grid.Column="2" Margin="0,0,0,12">
+                                <TextBlock Text="Access Token de Credenciales (Bearer)" Margin="0,0,0,4"/>
+                                <ui:TextBox x:Name="TxtMpAccessToken" PlaceholderText="APP_USR-... (Vacío para Simulación)"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,0,12">
+                                <TextBlock Text="ID de Colector (Collector ID)" Margin="0,0,0,4"/>
+                                <ui:TextBox x:Name="TxtMpCollectorId" PlaceholderText="Ej: 12345678"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="1" Grid.Column="2" Margin="0,0,0,12">
+                                <TextBlock Text="ID de Sucursal (Store ID)" Margin="0,0,0,4"/>
+                                <ui:TextBox x:Name="TxtMpStoreId" PlaceholderText="Ej: SUC001"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,0,0,12">
+                                <TextBlock Text="ID de POS Externo (External POS ID)" Margin="0,0,0,4"/>
+                                <ui:TextBox x:Name="TxtMpExternalPosId" PlaceholderText="Ej: CAJA01"/>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </TabItem>
             </TabControl>
         </ScrollViewer>
 

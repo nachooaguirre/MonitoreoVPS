@@ -6,6 +6,7 @@ using LiveChartsCore.SkiaSharpView.Painting;
 using LiveChartsCore.SkiaSharpView.WPF;
 using SkiaSharp;
 using SuperPOS.Client.Models;
+using SuperPOS.Shared.Entities.Ventas;
 
 namespace SuperPOS.Client.Views.Reportes;
 
@@ -16,6 +17,7 @@ public partial class ReportesPage : Page
         InitializeComponent();
         TxtFechaHoy.Text = DateTime.Now.ToString("dddd dd 'de' MMMM 'de' yyyy", new System.Globalization.CultureInfo("es-AR"));
         DpFechaDia.SelectedDate      = DateTime.Today;
+        DpFechaHistorial.SelectedDate = DateTime.Today;
         DpDesde.SelectedDate         = DateTime.Today.AddMonths(-1);
         DpHasta.SelectedDate         = DateTime.Today;
         DpRankingDesde.SelectedDate  = DateTime.Today.AddMonths(-1);
@@ -24,12 +26,14 @@ public partial class ReportesPage : Page
         Loaded += async (_, _) =>
         {
             await ConsultarVentasDia();
+            await ConsultarHistorial();
             await ConsultarStockBajo();
         };
     }
 
     // ─── Eventos ──────────────────────────────────────────────
     private async void BtnVentasDia_Click(object s, RoutedEventArgs e) => await ConsultarVentasDia();
+    private async void BtnConsultarHistorial_Click(object s, RoutedEventArgs e) => await ConsultarHistorial();
     private async void BtnPeriodo_Click(object s, RoutedEventArgs e)   => await ConsultarPeriodo();
     private async void BtnRanking_Click(object s, RoutedEventArgs e)   => await ConsultarRanking();
     private async void BtnStockBajo_Click(object s, RoutedEventArgs e) => await ConsultarStockBajo();
@@ -280,6 +284,104 @@ public partial class ReportesPage : Page
             }
         }
         catch (Exception ex) { MessageBox.Show($"Error: {ex.Message}"); }
+    }
+
+    // ─── TAB HISTORIAL DE VENTAS ──────────────────────────────
+    private async Task ConsultarHistorial()
+    {
+        try
+        {
+            var fecha = DpFechaHistorial.SelectedDate ?? DateTime.Today;
+            var res = await App.Api.GetVentas(desde: fecha, hasta: fecha, page: 1, pageSize: 200);
+            DgHistorialVentas.ItemsSource = res.items;
+            LimpiarDetalle();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error al cargar el historial: {ex.Message}");
+        }
+    }
+
+    private async void DgHistorialVentas_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (DgHistorialVentas.SelectedItem is not Comprobante c)
+        {
+            LimpiarDetalle();
+            return;
+        }
+
+        try
+        {
+            var cbte = await App.Api.GetVentaById(c.Id);
+            if (cbte is null) return;
+
+            TxtNoSeleccionado.Visibility = Visibility.Collapsed;
+            PanelDetalleContenido.Visibility = Visibility.Visible;
+            DgDetallesVenta.Visibility = Visibility.Visible;
+            PanelDetalleTotales.Visibility = Visibility.Visible;
+
+            TxtDetalleTitulo.Text = $"Detalle de Venta {cbte.TipoComprobante?.Abreviatura} {cbte.Letra} {cbte.PuntoVenta:D3}-{cbte.Numero:D8}";
+            TxtDetalleUsuario.Text = $"Cajero ID: {cbte.IdUsuario}";
+            TxtDetalleFecha.Text = $"Fecha: {cbte.Fecha.ToLocalTime():dd/MM/yyyy HH:mm}";
+
+            TxtDetalleEstado.Text = cbte.Estado.ToString();
+            if (cbte.Estado == EstadoComprobante.Anulado)
+            {
+                BorderDetalleEstado.Background = System.Windows.Media.Brushes.DarkRed;
+                TxtDetalleEstado.Foreground = System.Windows.Media.Brushes.White;
+                PanelDetalleAcciones.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                BorderDetalleEstado.Background = System.Windows.Media.Brushes.DarkGreen;
+                TxtDetalleEstado.Foreground = System.Windows.Media.Brushes.White;
+                PanelDetalleAcciones.Visibility = (App.PerfilActual.PuedeAnularVentas || App.PerfilActual.EsAdministrador) 
+                    ? Visibility.Visible 
+                    : Visibility.Collapsed;
+            }
+
+            DgDetallesVenta.ItemsSource = cbte.Detalles;
+
+            TxtDetalleSubtotal.Text = cbte.SubTotal.ToString("$ #,##0.00");
+            TxtDetalleDescuento.Text = cbte.TotalDescuento.ToString("$ #,##0.00");
+            TxtDetalleTotal.Text = cbte.Total.ToString("$ #,##0.00");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error al cargar el detalle de venta: {ex.Message}");
+        }
+    }
+
+    private void LimpiarDetalle()
+    {
+        TxtNoSeleccionado.Visibility = Visibility.Visible;
+        PanelDetalleContenido.Visibility = Visibility.Collapsed;
+        DgDetallesVenta.Visibility = Visibility.Collapsed;
+        PanelDetalleTotales.Visibility = Visibility.Collapsed;
+        PanelDetalleAcciones.Visibility = Visibility.Collapsed;
+        DgDetallesVenta.ItemsSource = null;
+    }
+
+    private async void BtnAnularVenta_Click(object sender, RoutedEventArgs e)
+    {
+        if (DgHistorialVentas.SelectedItem is not Comprobante c) return;
+
+        if (MessageBox.Show($"¿Está seguro de que desea ANULAR la venta seleccionada?\nEsta acción devolverá la mercadería al stock.", 
+            "Confirmar Anulación", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        try
+        {
+            await App.Api.AnularVenta(c.Id, App.IdUsuarioActual);
+            MessageBox.Show("Venta anulada correctamente.", "Éxito", MessageBoxButton.OK, MessageBoxImage.Information);
+            await ConsultarHistorial();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error al anular la venta: {ex.Message}");
+        }
     }
 
     // ─── Helpers ──────────────────────────────────────────────

@@ -21,14 +21,16 @@ public partial class NuevaOCWindow : Window
     private readonly int? _iaProveedor;
     private readonly IReadOnlyList<NuevaOCLineaInicial>? _iaLineas;
     private readonly int? _idOcEdit;
+    private readonly int? _idOcOrigen;
 
-    public NuevaOCWindow() : this(null, null, null) { }
+    public NuevaOCWindow() : this(null, null, null, null) { }
 
-    public NuevaOCWindow(int? idProveedor, IReadOnlyList<NuevaOCLineaInicial>? lineasIa, int? idOcEdit = null)
+    public NuevaOCWindow(int? idProveedor, IReadOnlyList<NuevaOCLineaInicial>? lineasIa, int? idOcEdit = null, int? idOcOrigen = null)
     {
         _iaProveedor = idProveedor;
         _iaLineas = lineasIa;
         _idOcEdit = idOcEdit;
+        _idOcOrigen = idOcOrigen;
         InitializeComponent();
         DgDetalle.ItemsSource = _items;
         DgProveedores.ItemsSource = _proveedores;
@@ -36,6 +38,8 @@ public partial class NuevaOCWindow : Window
         
         if (_idOcEdit.HasValue)
             Title = $"Editar Orden de Compra (OC-{_idOcEdit.Value:D6})";
+        else if (_idOcOrigen.HasValue)
+            Title = $"Nueva Orden de Compra por Diferencias (Origen: OC-{_idOcOrigen.Value:D6})";
         else
             Title = _iaLineas is { Count: > 0 } ? "Nueva Orden de Compra (desde IA)" : "Nueva Orden de Compra";
         
@@ -61,6 +65,12 @@ public partial class NuevaOCWindow : Window
             {
                 CboProveedor.SelectedValue = _iaProveedor.Value;
                 await RecargarCatalogoAsync();
+            }
+
+            if (_idOcOrigen.HasValue)
+            {
+                BrdDiferencias.Visibility = Visibility.Visible;
+                CboMotivo.SelectedIndex = 0;
             }
 
             if (_iaLineas is { Count: > 0 })
@@ -315,7 +325,10 @@ public partial class NuevaOCWindow : Window
                     IdProveedor = pInfo.IdProveedor,
                     IdUsuario = App.UsuarioSession?.Id ?? App.IdUsuarioActual,
                     FechaEntregaEsperada = pInfo.FechaEsperada?.ToUniversalTime(),
-                    Estado = _iaLineas is { Count: > 0 } ? EstadoOrdenCompra.Borrador : EstadoOrdenCompra.Pendiente,
+                    Estado = (_iaLineas is { Count: > 0 } || _idOcOrigen.HasValue) ? EstadoOrdenCompra.Borrador : EstadoOrdenCompra.Pendiente,
+                    IdOrdenCompraOriginal = _idOcOrigen,
+                    MotivoDiferencia = _idOcOrigen.HasValue ? CboMotivo.Text : null,
+                    Observaciones = _idOcOrigen.HasValue ? TxtObservaciones.Text : null,
                     Detalles = itemsProv.Select(i => new OrdenCompraDetalle
                     {
                         IdArticulo = i.IdArticulo,
@@ -348,6 +361,43 @@ public partial class NuevaOCWindow : Window
         catch (Exception ex)
         {
             MessageBox.Show($"Error: {ex.Message}");
+        }
+    }
+
+    private void TxtNumeric_GotFocus(object sender, RoutedEventArgs e)
+    {
+        if (sender is TextBox tb)
+        {
+            tb.SelectAll();
+        }
+    }
+
+    private void TxtNumeric_PreviewTextInput(object sender, TextCompositionEventArgs e)
+    {
+        e.Handled = !System.Text.RegularExpressions.Regex.IsMatch(e.Text, @"^[0-9\.\,]+$");
+    }
+
+    private void BtnMinusCant_Click(object sender, RoutedEventArgs e)
+    {
+        if (decimal.TryParse(TxtCant.Text, out var val))
+        {
+            TxtCant.Text = Math.Max(1m, val - 1m).ToString("G");
+        }
+        else
+        {
+            TxtCant.Text = "1";
+        }
+    }
+
+    private void BtnPlusCant_Click(object sender, RoutedEventArgs e)
+    {
+        if (decimal.TryParse(TxtCant.Text, out var val))
+        {
+            TxtCant.Text = (val + 1m).ToString("G");
+        }
+        else
+        {
+            TxtCant.Text = "1";
         }
     }
 

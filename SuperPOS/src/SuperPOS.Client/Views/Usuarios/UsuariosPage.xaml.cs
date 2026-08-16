@@ -140,7 +140,7 @@ public partial class UsuariosPage : Page
     {
         if ((sender as Button)?.Tag is not Usuario u) return;
         if (u.Id == 1) { MessageBox.Show("No se puede eliminar el admin principal."); return; }
-        if (MessageBox.Show($"¿Desactivar usuario \"{u.NombreUsuario}\"?", "Confirmar",
+        if (MessageBox.Show($"¿Está seguro de que desea eliminar al usuario \"{u.NombreUsuario}\"?", "Eliminar Usuario",
                 MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
         try { await App.Api.EliminarUsuario(u.Id); await CargarUsuarios(); }
         catch (Exception ex) { MessageBox.Show($"Error: {ex.Message}"); }

@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         Title="Proveedor"
-        Width="680" Height="500"
+        Width="800" Height="650"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         ExtendsContentIntoTitleBar="True">
@@ -14,90 +14,129 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <ui:TitleBar x:Name="TitleBarCtrl" Grid.Row="0" Title="Proveedor"/>
-        <ScrollViewer Grid.Row="1" Padding="20,12">
-            <StackPanel>
-                <TextBlock Text="Identificación" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,8"/>
-                <Grid Margin="0,0,0,12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="160"/>
-                        <ColumnDefinition Width="160"/>
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                        <TextBlock Text="Razón Social *" Margin="0,0,0,4"/>
-                        <ui:TextBox x:Name="TxtRazonSocial"/>
+        
+        <TabControl Grid.Row="1" x:Name="TabProveedor" Background="#141414" BorderThickness="0" Padding="0" Margin="16,8,16,8">
+            <TabItem Header="📄 Ficha del Proveedor">
+                <ScrollViewer Padding="10,12" VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <TextBlock Text="Identificación" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,8"/>
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="160"/>
+                                <ColumnDefinition Width="160"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                <TextBlock Text="Razón Social *" Margin="0,0,0,4"/>
+                                <ui:TextBox x:Name="TxtRazonSocial"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                                <TextBlock Text="CUIT" Margin="0,0,0,4"/>
+                                <ui:TextBox x:Name="TxtCuit" PlaceholderText="30000000000"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Código Proveedor" Margin="0,0,0,4"/>
+                                <ui:TextBox x:Name="TxtCodigo" PlaceholderText="001"/>
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock Text="Contacto" FontWeight="SemiBold" FontSize="14" Margin="0,8,0,8"/>
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                <TextBlock Text="Teléfono" Margin="0,0,0,4"/>
+                                <ui:TextBox x:Name="TxtTelefono"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                                <TextBlock Text="Celular" Margin="0,0,0,4"/>
+                                <ui:TextBox x:Name="TxtCelular"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Email" Margin="0,0,0,4"/>
+                                <ui:TextBox x:Name="TxtEmail"/>
+                            </StackPanel>
+                        </Grid>
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="2*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                <TextBlock Text="Dirección" Margin="0,0,0,4"/>
+                                <ui:TextBox x:Name="TxtDireccion"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                                <TextBlock Text="Localidad" Margin="0,0,0,4"/>
+                                <ui:TextBox x:Name="TxtLocalidad"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Provincia" Margin="0,0,0,4"/>
+                                <ui:TextBox x:Name="TxtProvincia"/>
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock Text="Condiciones Comerciales" FontWeight="SemiBold" FontSize="14" Margin="0,8,0,8"/>
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="2*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                <TextBlock Text="Días Entrega" Margin="0,0,0,4"/>
+                                <ui:TextBox x:Name="TxtDiasEntrega" PlaceholderText="7"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                                <TextBlock Text="Días Vto. Pago" Margin="0,0,0,4"/>
+                                <ui:TextBox x:Name="TxtDiasPago" PlaceholderText="30"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Observaciones" Margin="0,0,0,4"/>
+                                <ui:TextBox x:Name="TxtObs"/>
+                            </StackPanel>
+                        </Grid>
+                        <CheckBox x:Name="ChkActivo" Content="Activo" IsChecked="True"/>
                     </StackPanel>
-                    <StackPanel Grid.Column="1" Margin="0,0,8,0">
-                        <TextBlock Text="CUIT" Margin="0,0,0,4"/>
-                        <ui:TextBox x:Name="TxtCuit" PlaceholderText="30000000000"/>
-                    </StackPanel>
-                    <StackPanel Grid.Column="2">
-                        <TextBlock Text="Código Proveedor" Margin="0,0,0,4"/>
-                        <ui:TextBox x:Name="TxtCodigo" PlaceholderText="001"/>
-                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem x:Name="TabArticulos" Header="🏷️ Artículos Vinculados">
+                <Grid Margin="10,12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    
+                    <DockPanel Grid.Row="0" Margin="0,0,0,12">
+                        <ui:Button x:Name="BtnVincularArticulo" DockPanel.Dock="Right" Content="➕ Vincular Artículo" Appearance="Primary" Click="BtnVincularArticulo_Click" Margin="8,0,0,0" Height="36"/>
+                        <ui:TextBox x:Name="TxtBuscarArticulo" PlaceholderText="Buscar artículos vinculados por descripción, código o barras..." IconPlacement="Left" Icon="Search" TextChanged="TxtBuscarArticulo_TextChanged" Height="36"/>
+                    </DockPanel>
+                    
+                    <DataGrid x:Name="DgArticulosVinculados" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
+                              Background="#181818" Foreground="#E0E8F0" RowBackground="#1E1E1E" AlternatingRowBackground="#222830"
+                              BorderThickness="0" RowHeight="36" CanUserAddRows="False">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Código Interno" Binding="{Binding CodigoInterno}" Width="110"/>
+                            <DataGridTextColumn Header="Cód. Barras (EAN)" Binding="{Binding CodigoBarras}" Width="140"/>
+                            <DataGridTextColumn Header="Descripción" Binding="{Binding Descripcion}" Width="*"/>
+                            <DataGridTextColumn Header="P. Costo" Binding="{Binding PrecioCosto, StringFormat=C2}" Width="100"/>
+                            <DataGridTextColumn Header="P. Venta" Binding="{Binding PrecioVenta, StringFormat=C2}" Width="100"/>
+                            <DataGridTemplateColumn Header="Acción" Width="120">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <ui:Button Content="Desvincular" Appearance="Secondary" 
+                                                   Click="BtnDesvincularArticulo_Click" Padding="8,4" Margin="4,2"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
                 </Grid>
-                <TextBlock Text="Contacto" FontWeight="SemiBold" FontSize="14" Margin="0,8,0,8"/>
-                <Grid Margin="0,0,0,12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                        <TextBlock Text="Teléfono" Margin="0,0,0,4"/>
-                        <ui:TextBox x:Name="TxtTelefono"/>
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Margin="0,0,8,0">
-                        <TextBlock Text="Celular" Margin="0,0,0,4"/>
-                        <ui:TextBox x:Name="TxtCelular"/>
-                    </StackPanel>
-                    <StackPanel Grid.Column="2">
-                        <TextBlock Text="Email" Margin="0,0,0,4"/>
-                        <ui:TextBox x:Name="TxtEmail"/>
-                    </StackPanel>
-                </Grid>
-                <Grid Margin="0,0,0,12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="2*"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                        <TextBlock Text="Dirección" Margin="0,0,0,4"/>
-                        <ui:TextBox x:Name="TxtDireccion"/>
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Margin="0,0,8,0">
-                        <TextBlock Text="Localidad" Margin="0,0,0,4"/>
-                        <ui:TextBox x:Name="TxtLocalidad"/>
-                    </StackPanel>
-                    <StackPanel Grid.Column="2">
-                        <TextBlock Text="Provincia" Margin="0,0,0,4"/>
-                        <ui:TextBox x:Name="TxtProvincia"/>
-                    </StackPanel>
-                </Grid>
-                <TextBlock Text="Condiciones Comerciales" FontWeight="SemiBold" FontSize="14" Margin="0,8,0,8"/>
-                <Grid Margin="0,0,0,12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="2*"/>
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                        <TextBlock Text="Días Entrega" Margin="0,0,0,4"/>
-                        <ui:TextBox x:Name="TxtDiasEntrega" PlaceholderText="7"/>
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Margin="0,0,8,0">
-                        <TextBlock Text="Días Vto. Pago" Margin="0,0,0,4"/>
-                        <ui:TextBox x:Name="TxtDiasPago" PlaceholderText="30"/>
-                    </StackPanel>
-                    <StackPanel Grid.Column="2">
-                        <TextBlock Text="Observaciones" Margin="0,0,0,4"/>
-                        <ui:TextBox x:Name="TxtObs"/>
-                    </StackPanel>
-                </Grid>
-                <CheckBox x:Name="ChkActivo" Content="Activo" IsChecked="True"/>
-            </StackPanel>
-        </ScrollViewer>
+            </TabItem>
+        </TabControl>
+        
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="20,12">
             <Button Content="Cancelar" Width="100" Height="36" Margin="0,0,8,0" Click="BtnCancelar_Click"/>
             <ui:Button Content="Guardar" Appearance="Primary" Width="120" Height="36" Click="BtnGuardar_Click"/>

@@ -26,16 +26,46 @@ public partial class CajaPage : Page
     { 
         InitializeComponent(); 
         Loaded += OnLoaded; 
+        Unloaded += OnUnloaded;
         PreviewKeyDown += Page_PreviewKeyDown;
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         DgItems.ItemsSource = _items;
-        _items.CollectionChanged += (_, _) => ActualizarTotales();
+        _items.CollectionChanged += OnItemsCollectionChanged;
         await CargarCombos();
         await InicializarTeclado();
         TxtBuscarArticulo.Focus();
+    }
+
+    private void OnItemsCollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    {
+        if (e.NewItems != null)
+        {
+            foreach (ItemVenta item in e.NewItems)
+            {
+                item.PropertyChanged += Item_PropertyChanged;
+            }
+        }
+        if (e.OldItems != null)
+        {
+            foreach (ItemVenta item in e.OldItems)
+            {
+                item.PropertyChanged -= Item_PropertyChanged;
+            }
+        }
+        ActualizarTotales();
+    }
+
+    private void Item_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ItemVenta.Cantidad) || 
+            e.PropertyName == nameof(ItemVenta.PrecioUnitario) || 
+            e.PropertyName == nameof(ItemVenta.PorcentajeDescuento))
+        {
+            ActualizarTotales();
+        }
     }
 
     private async Task CargarCombos()
@@ -94,6 +124,13 @@ public partial class CajaPage : Page
 
     private void Page_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (e.Key == Key.F11)
+        {
+            e.Handled = true;
+            ToggleFullScreen();
+            return;
+        }
+
         // Ignorar teclas de control, especiales o de navegación
         if (e.Key == Key.System || e.Key == Key.Tab || 
             (e.Key >= Key.F1 && e.Key <= Key.F24) || 
@@ -104,19 +141,18 @@ public partial class CajaPage : Page
             return;
         }
 
-        var focusElement = FocusManager.GetFocusedElement(this) as DependencyObject;
-        if (focusElement is TextBox tb && tb != TxtBuscarArticulo)
+        var focused = Keyboard.FocusedElement as DependencyObject;
+        if (focused != null && IsInputControl(focused))
         {
-            return;
-        }
-
-        if (FocusManager.GetFocusedElement(this) != TxtBuscarArticulo)
-        {
-            if ((e.Key == Key.Enter || e.Key == Key.Space || e.Key == Key.Return) && focusElement is Button)
+            if (IsDescendantOf(focused, TxtBuscarArticulo))
             {
                 return;
             }
+            return;
+        }
 
+        if (Keyboard.FocusedElement != TxtBuscarArticulo)
+        {
             if (e.Key == Key.LeftShift || e.Key == Key.RightShift || 
                 e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl || 
                 e.Key == Key.LeftAlt || e.Key == Key.RightAlt)
@@ -136,6 +172,7 @@ public partial class CajaPage : Page
             await BuscarYAgregarArticulo();
         }
         else if (e.Key == Key.F12) BtnCobrar_Click(sender, new RoutedEventArgs());
+        else if (e.Key == Key.F10) BtnDividirPago_Click(sender, new RoutedEventArgs());
         else if (e.Key == Key.F9) LimpiarVenta();
     }
 
@@ -174,6 +211,11 @@ public partial class CajaPage : Page
 
         TxtBuscarArticulo.Clear();
         TxtCantidad.Text = "1";
+    }
+
+    private async Task Page_PreviewKeyDown_Override(object sender, KeyEventArgs e)
+    {
+        // En caso de que se implementen atajos a nivel página
     }
 
     private async void AgregarArticuloALista(Articulo art, decimal cant)
@@ -278,6 +320,20 @@ public partial class CajaPage : Page
         TxtVuelto.Text = $"$ {Math.Max(0, vuelto):N2}";
     }
 
+    private async void BtnDividirPago_Click(object sender, RoutedEventArgs e)
+    {
+        if (_items.Count == 0) { MessageBox.Show("No hay artículos en la venta.", "Aviso"); return; }
+        if (_clienteActual is null) { MessageBox.Show("Seleccione un cliente.", "Aviso"); return; }
+
+        var total = _items.Sum(i => i.SubTotal);
+        var dlg = new DividirPagoWindow(total, _mediosPago) { Owner = Window.GetWindow(this) };
+        if (dlg.ShowDialog() == true && dlg.Pagos.Count > 0)
+        {
+            decimal totalRecibido = dlg.Pagos.Sum(p => p.Importe + p.Vuelto);
+            await ProcesarCobro(dlg.Pagos, totalRecibido);
+        }
+    }
+
     private async void BtnCobrar_Click(object sender, RoutedEventArgs e)
     {
         if (_items.Count == 0) { MessageBox.Show("No hay artículos en la venta.", "Aviso"); return; }
@@ -287,9 +343,54 @@ public partial class CajaPage : Page
         decimal.TryParse(TxtMontoRecibido.Text.Replace(',', '.'), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var recibido);
         var idMedio = CmbMedioPago.SelectedValue is int m ? m : 1;
 
+        string? referenciaPago = null;
+        try
+        {
+            var globalCfg = await App.Api.GetConfiguracion();
+            
+            // 1. Integración con Postnet (Tarjeta de Débito = 2 o Tarjeta de Crédito = 3)
+            if ((idMedio == 2 || idMedio == 3) && globalCfg?.PosnetHabilitado == true)
+            {
+                var dlg = new ProcesandoPagoWindow(total, esCredito: idMedio == 3) { Owner = Window.GetWindow(this) };
+                if (dlg.ShowDialog() != true)
+                {
+                    return; // Transacción cancelada o fallida por el cajero
+                }
+                referenciaPago = $"{dlg.TarjetaMarca} (*{dlg.TarjetaUltimosDigitos}) Aut:{dlg.CodigoAutorizacion} Cup:{dlg.NumeroCupon}";
+                recibido = total;
+            }
+            // 2. Integración con Mercado Pago QR (idMedio == 4)
+            else if (idMedio == 4 && globalCfg?.MpQrHabilitado == true)
+            {
+                var dlg = new MercadoPagoQrWindow(total) { Owner = Window.GetWindow(this) };
+                if (dlg.ShowDialog() != true)
+                {
+                    return; // Transacción cancelada o fallida por el cajero
+                }
+                referenciaPago = dlg.ReferenciaPago;
+                recibido = total;
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error al inicializar el pago integrado:\n{ex.Message}", "Error de Conexión");
+            return;
+        }
+
         if (idMedio == 1 && recibido < total)
         { MessageBox.Show("El monto recibido no cubre el total.", "Aviso"); return; }
 
+        var pagos = new List<ComprobantePago>
+        {
+            new() { IdMedioPago = idMedio, Importe = Math.Min(recibido, total), Vuelto = Math.Max(0, recibido - total), Referencia = referenciaPago }
+        };
+
+        await ProcesarCobro(pagos, recibido);
+    }
+
+    private async Task ProcesarCobro(List<ComprobantePago> pagos, decimal totalRecibido)
+    {
+        var total = _items.Sum(i => i.SubTotal);
         var tipoId = CmbTipoComprobante.SelectedValue is int tc ? tc : 7;
         var iva21 = _items.Where(i => i.AlicuotaIva == 21).Sum(i => i.SubTotal - i.Cantidad * i.PrecioUnitario / 1.21m);
         var iva105 = _items.Where(i => i.AlicuotaIva == 10.5m).Sum(i => i.SubTotal - i.Cantidad * i.PrecioUnitario / 1.105m);
@@ -300,7 +401,7 @@ public partial class CajaPage : Page
             IdTipoComprobante = tipoId,
             Letra = 'B',
             PuntoVenta = 1,
-            IdCliente = _clienteActual.Id,
+            IdCliente = _clienteActual!.Id,
             IdCaja = 1,
             IdSucursal = 1,
             IdUsuario = App.IdUsuarioActual,
@@ -319,10 +420,7 @@ public partial class CajaPage : Page
                 MontoIva = i.SubTotal - i.Cantidad * i.PrecioUnitario / (1 + i.AlicuotaIva / 100),
                 SubTotal = i.SubTotal
             }).ToList(),
-            Pagos = new List<ComprobantePago>
-            {
-                new() { IdMedioPago = idMedio, Importe = Math.Min(recibido, total), Vuelto = Math.Max(0, recibido - total) }
-            }
+            Pagos = pagos
         };
 
         try
@@ -350,7 +448,8 @@ public partial class CajaPage : Page
                         cbte.QrAfip = resultado.QrAfip;
                     }
 
-                    await SuperPOS.Client.Services.TicketPrinter.ImprimirVenta(cbte, itemsSnapshot, _clienteActual!, printerName, piePagina);
+                    await SuperPOS.Client.Services.TicketPrinter.ImprimirVenta(cbte, itemsSnapshot, _clienteActual!, printerName, piePagina,
+                        globalCfg?.NombreEmpresa, globalCfg?.Cuit, globalCfg?.Direccion);
                 }
                 catch (Exception printEx)
                 {
@@ -358,7 +457,7 @@ public partial class CajaPage : Page
                 }
             });
 
-            MessageBox.Show($"Venta registrada!\n\nComprobante Nº {resultado?.Numero:000000}\nTotal: $ {total:N2}\nVuelto: $ {Math.Max(0, recibido - total):N2}",
+            MessageBox.Show($"Venta registrada!\n\nComprobante Nº {resultado?.Numero:000000}\nTotal: $ {total:N2}\nVuelto: $ {Math.Max(0, totalRecibido - total):N2}",
                 "Venta OK", MessageBoxButton.OK, MessageBoxImage.Information);
             LimpiarVenta();
         }
@@ -392,8 +491,23 @@ public partial class CajaPage : Page
             var funciones = await App.Api.GetPOSFuncionesPorPanel(panelId);
             CanvasKeypad.Children.Clear();
 
-            CanvasKeypad.Width = 400;
-            CanvasKeypad.Height = 400;
+            // Calcular dinámicamente los límites del teclado para que ocupe todo el ancho
+            double maxX = 400;
+            double maxY = 400;
+            if (funciones.Count > 0)
+            {
+                var computedMaxX = funciones.Max(f => (f.PosX ?? 0) + (f.Ancho ?? 90));
+                var computedMaxY = funciones.Max(f => (f.PosY ?? 0) + (f.Alto ?? 50));
+                if (computedMaxX > 0) maxX = computedMaxX;
+                if (computedMaxY > 0) maxY = computedMaxY;
+            }
+
+            // Añadir un pequeño margen de seguridad
+            maxX += 2;
+            maxY += 2;
+
+            CanvasKeypad.Width = maxX;
+            CanvasKeypad.Height = maxY;
 
             foreach (var func in funciones)
             {
@@ -403,7 +517,8 @@ public partial class CajaPage : Page
                     TextWrapping = TextWrapping.Wrap,
                     TextAlignment = TextAlignment.Center,
                     VerticalAlignment = VerticalAlignment.Center,
-                    HorizontalAlignment = HorizontalAlignment.Center
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    FontWeight = FontWeights.Bold
                 };
 
                 var btn = new Button
@@ -411,36 +526,37 @@ public partial class CajaPage : Page
                     Content = textBlock,
                     Width = func.Ancho ?? 90,
                     Height = func.Alto ?? 50,
-                    FontSize = func.FontSize ?? 12,
+                    FontSize = func.FontSize ?? 15,
+                    FontWeight = FontWeights.Bold,
                     Tag = func
                 };
 
-                // Estilizado dinámico (Premium)
-                btn.Background = new SolidColorBrush(Color.FromRgb(32, 32, 54));
-                btn.Foreground = new SolidColorBrush(Color.FromRgb(240, 240, 240));
-                btn.BorderBrush = new SolidColorBrush(Color.FromRgb(77, 77, 106));
+                // Estilizado dinámico (Premium - Coherente con resto de la app)
+                btn.Background = new SolidColorBrush(Color.FromRgb(42, 42, 42)); // #2A2A2A
+                btn.Foreground = new SolidColorBrush(Color.FromRgb(224, 224, 224)); // #E0E0E0
+                btn.BorderBrush = new SolidColorBrush(Color.FromRgb(58, 58, 58)); // #3A3A3A
                 btn.BorderThickness = new Thickness(1);
 
                 // Si es un producto / artículo, destacar con tono verdoso
                 if (func.Funcion == "Articulo" || func.Codigo > 0 || !string.IsNullOrEmpty(func.Busqueda))
                 {
-                    btn.Background = new SolidColorBrush(Color.FromRgb(26, 46, 36));
-                    btn.BorderBrush = new SolidColorBrush(Color.FromRgb(42, 106, 62));
-                    btn.Foreground = new SolidColorBrush(Color.FromRgb(80, 212, 160));
+                    btn.Background = new SolidColorBrush(Color.FromRgb(26, 58, 42)); // #1A3A2A
+                    btn.BorderBrush = new SolidColorBrush(Color.FromRgb(42, 90, 58)); // #2A5A3A
+                    btn.Foreground = new SolidColorBrush(Color.FromRgb(100, 200, 128)); // #64C880
                 }
                 // Si es un medio de pago o acción clave (Cobrar)
                 else if (func.Funcion == "Cobrar" || func.LlamarFuncion == 12 || func.Funcion == "MedioPago")
                 {
-                    btn.Background = new SolidColorBrush(Color.FromRgb(74, 42, 16));
-                    btn.BorderBrush = new SolidColorBrush(Color.FromRgb(154, 80, 26));
-                    btn.Foreground = new SolidColorBrush(Color.FromRgb(255, 193, 7));
+                    btn.Background = new SolidColorBrush(Color.FromRgb(42, 26, 26)); // #2A1A1A
+                    btn.BorderBrush = new SolidColorBrush(Color.FromRgb(90, 42, 42)); // #5A2A2A
+                    btn.Foreground = new SolidColorBrush(Color.FromRgb(255, 112, 112)); // #FF7070
                 }
                 // Si cambia de panel (navegación)
                 else if (func.MoverPanel > 0)
                 {
-                    btn.Background = new SolidColorBrush(Color.FromRgb(32, 54, 86));
-                    btn.BorderBrush = new SolidColorBrush(Color.FromRgb(46, 86, 126));
-                    btn.Foreground = new SolidColorBrush(Color.FromRgb(138, 173, 223));
+                    btn.Background = new SolidColorBrush(Color.FromRgb(26, 42, 64)); // #1A2A40
+                    btn.BorderBrush = new SolidColorBrush(Color.FromRgb(42, 58, 90)); // #2A3A5A
+                    btn.Foreground = new SolidColorBrush(Color.FromRgb(64, 144, 192)); // #4090C0
                 }
 
                 btn.Click += BtnDynamicKeypad_Click;
@@ -535,6 +651,57 @@ public partial class CajaPage : Page
             await CargarKeypad(prev);
         }
     }
+
+    private bool IsInputControl(DependencyObject? element)
+    {
+        var current = element;
+        while (current != null)
+        {
+            if (current is TextBox or ComboBox or DatePicker or Button)
+                return true;
+
+            var typeName = current.GetType().Name;
+            if (typeName.Contains("TextBox") || typeName.Contains("ComboBox") || typeName.Contains("DatePicker") || typeName.Contains("Button"))
+                return true;
+
+            current = VisualTreeHelper.GetParent(current);
+        }
+        return false;
+    }
+
+    private bool IsDescendantOf(DependencyObject? element, DependencyObject parent)
+    {
+        var current = element;
+        while (current != null)
+        {
+            if (current == parent)
+                return true;
+            current = VisualTreeHelper.GetParent(current);
+        }
+        return false;
+    }
+    private bool _isFullScreen = false;
+
+    private void ToggleFullScreen()
+    {
+        var win = Window.GetWindow(this) as MainWindow;
+        if (win != null)
+        {
+            _isFullScreen = !_isFullScreen;
+            win.TogglePantallaCompleta(_isFullScreen);
+        }
+    }
+
+    private void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        // Asegurar que si salimos de la página, restauramos la ventana
+        if (_isFullScreen)
+        {
+            var win = Window.GetWindow(this) as MainWindow;
+            win?.TogglePantallaCompleta(false);
+            _isFullScreen = false;
+        }
+    }
 }
 
 public class ItemVenta : INotifyPropertyChanged
@@ -564,7 +731,14 @@ public class ItemVenta : INotifyPropertyChanged
     public decimal SubTotal
     {
         get => _subTotal;
-        private set { _subTotal = value; OnPropertyChanged(); }
+        private set 
+        { 
+            if (_subTotal != value)
+            {
+                _subTotal = value; 
+                OnPropertyChanged(); 
+            }
+        }
     }
 
     public void Calcular()

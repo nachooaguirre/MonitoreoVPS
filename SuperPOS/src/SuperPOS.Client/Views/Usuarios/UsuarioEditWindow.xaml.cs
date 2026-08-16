@@ -22,6 +22,7 @@ public partial class UsuarioEditWindow : Wpf.Ui.Controls.FluentWindow
             TxtEmail.Text = usuario.Email;
             TxtTelefono.Text = usuario.Telefono;
             ChkActivo.IsChecked = usuario.Activo;
+            ChkAccesoZebra.IsChecked = usuario.AccesoZebra;
             TxtLabelPass.Text = "Nueva contraseña (dejar vacío para no cambiar)";
         }
         Loaded += OnLoaded;
@@ -66,7 +67,8 @@ public partial class UsuarioEditWindow : Wpf.Ui.Controls.FluentWindow
                     TxtNombreCompleto.Text.Trim(),
                     pass, idPerfil,
                     TxtEmail.Text.Trim().NullIfEmpty(),
-                    TxtTelefono.Text.Trim().NullIfEmpty());
+                    TxtTelefono.Text.Trim().NullIfEmpty(),
+                    ChkAccesoZebra.IsChecked == true);
             }
             else
             {
@@ -77,7 +79,8 @@ public partial class UsuarioEditWindow : Wpf.Ui.Controls.FluentWindow
                     ChkActivo.IsChecked == true,
                     string.IsNullOrWhiteSpace(pass) ? null : pass,
                     TxtEmail.Text.Trim().NullIfEmpty(),
-                    TxtTelefono.Text.Trim().NullIfEmpty());
+                    TxtTelefono.Text.Trim().NullIfEmpty(),
+                    ChkAccesoZebra.IsChecked == true);
             }
             DialogResult = true;
             Close();

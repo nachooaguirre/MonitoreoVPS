@@ -23,6 +23,7 @@ public partial class DetalleOCWindow : Window
     private string _fechaEmisionTxt = "";
     private string _fechaEntregaTxt = "-";
     private readonly List<FilaImpresionOc> _filasImpresion = [];
+    private int? _idOcOriginal;
 
     public DetalleOCWindow(int idOC)
     {
@@ -43,7 +44,38 @@ public partial class DetalleOCWindow : Window
             _filasImpresion.Clear();
             _nroOrden = oc.TryGetProperty("nroOrden", out var nro) ? nro.GetInt32() : oc.TryGetProperty("NroOrden", out var nro2) ? nro2.GetInt32() : 0;
             _proveedorNombre = ReadString(oc, "proveedorNombre", "ProveedorNombre") ?? "";
+
+            var idOriginal = ReadInt(oc, "idOrdenCompraOriginal", "IdOrdenCompraOriginal");
+            var motivoDiferencia = ReadString(oc, "motivoDiferencia", "MotivoDiferencia");
+            var nroOriginal = ReadInt(oc, "nroOrdenOriginal", "NroOrdenOriginal");
+
+            if (idOriginal > 0)
+            {
+                BrdOriginalOcAlert.Visibility = Visibility.Visible;
+                RunOriginalOcLink.Text = $"OC-{nroOriginal:D6}";
+                _idOcOriginal = idOriginal;
+
+                if (!string.IsNullOrEmpty(motivoDiferencia))
+                    TxtMotivoAlerta.Text = $" · Motivo: {motivoDiferencia}";
+                else
+                    TxtMotivoAlerta.Text = "";
+            }
+            else
+            {
+                BrdOriginalOcAlert.Visibility = Visibility.Collapsed;
+                _idOcOriginal = null;
+            }
             _proveedorEmail = ReadString(oc, "proveedorEmail", "ProveedorEmail");
+            var observaciones = ReadString(oc, "observaciones", "Observaciones");
+            if (!string.IsNullOrEmpty(observaciones))
+            {
+                BrdObservaciones.Visibility = Visibility.Visible;
+                TxtObservaciones.Text = observaciones;
+            }
+            else
+            {
+                BrdObservaciones.Visibility = Visibility.Collapsed;
+            }
             var estado = ReadInt(oc, "estado", "Estado");
             var total = ReadDecimal(oc, "total", "Total");
             var sinIva = ReadDecimal(oc, "totalSinIva", "TotalSinIva");
@@ -78,15 +110,30 @@ public partial class DetalleOCWindow : Window
                 3 => ("RECIBIDA", "#0A2010", "#40C060"),
                 4 => ("ANULADA", "#200808", "#C04040"),
                 5 => ("BORRADOR (IA)", "#1A1028", "#B080E8"),
+                6 => ("DEVUELTA AL PROV.", "#2D1000", "#E06020"),
                 _ => ("—", "#202020", "#808080")
             };
             TxtEstado.Text = label;
             TxtEstado.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(fg)!);
             BrdEstado.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(bg)!);
 
-            BtnAnular.IsEnabled = estado != 3 && estado != 4;
+            BtnAnular.IsEnabled = estado != 3 && estado != 4 && estado != 6;
             BtnEditar.IsEnabled = estado == 0 || estado == 5; // Solo PENDIENTE o BORRADOR
-            BtnRecibir.IsEnabled = estado is >= 0 and <= 2;
+            BtnConfirmarBorrador.Visibility = estado == 5 ? Visibility.Visible : Visibility.Collapsed;
+            BtnRecibir.Visibility = (estado is >= 0 and <= 2 && estado != 5) ? Visibility.Visible : Visibility.Collapsed;
+            BtnRecibir.IsEnabled = estado is >= 0 and <= 2 && estado != 5;
+
+            BtnDevolver.Visibility = (estado is >= 0 and <= 2 && estado != 5) ? Visibility.Visible : Visibility.Collapsed;
+            BtnDevolver.IsEnabled = estado is >= 0 and <= 2 && estado != 5;
+
+            bool tieneDiferencias = false;
+            if (oc.TryGetProperty("detalles", out var detPropCheck) || oc.TryGetProperty("Detalles", out detPropCheck))
+            {
+                tieneDiferencias = detPropCheck.EnumerateArray().Any(d =>
+                    ReadDecimal(d, "cantidadRecibida", "CantidadRecibida") != ReadDecimal(d, "cantidadPedida", "CantidadPedida")
+                );
+            }
+            BtnOCDiferencias.IsEnabled = (estado == 2 || estado == 3) && tieneDiferencias;
 
             if (oc.TryGetProperty("detalles", out var detProp) || oc.TryGetProperty("Detalles", out detProp))
             {
@@ -107,6 +154,7 @@ public partial class DetalleOCWindow : Window
                     var pCosto = ReadDecimal(d, "precioCosto", "PrecioCosto");
                     var alic = ReadDecimal(d, "alicuotaIva", "AlicuotaIva");
                     var sub = ReadDecimal(d, "subtotal", "Subtotal");
+                    var obsDif = ReadString(d, "observacionDiferencia", "ObservacionDiferencia");
 
                     _filasImpresion.Add(new FilaImpresionOc(cod, desc, cantPed, cantRec, pCosto, alic, sub));
 
@@ -118,7 +166,8 @@ public partial class DetalleOCWindow : Window
                         CantidadRecibida = cantRec,
                         PrecioCosto = pCosto,
                         AlicuotaIva = alic,
-                        Subtotal = sub
+                        Subtotal = sub,
+                        ObservacionDiferencia = obsDif
                     };
                 }).ToList();
 
@@ -178,6 +227,64 @@ public partial class DetalleOCWindow : Window
         var dlg = new RecibirPedidoWindow(_idOC);
         dlg.ShowDialog();
         await Cargar();
+    }
+
+    private async void BtnOCDiferencias_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var ocNullable = await App.Api.GetOrdenCompraDetalle(_idOC);
+            if (ocNullable == null) return;
+            var oc = ocNullable.Value;
+
+            var idProv = ReadInt(oc, "idProveedor", "IdProveedor");
+            var provNombre = ReadString(oc, "proveedorNombre", "ProveedorNombre") ?? "";
+
+            var lineasDiferencias = new List<NuevaOCLineaInicial>();
+            if (oc.TryGetProperty("detalles", out var detProp) || oc.TryGetProperty("Detalles", out detProp))
+            {
+                foreach (var d in detProp.EnumerateArray())
+                {
+                    var cPedida = ReadDecimal(d, "cantidadPedida", "CantidadPedida");
+                    var cRecibida = ReadDecimal(d, "cantidadRecibida", "CantidadRecibida");
+                    if (cPedida == cRecibida) continue;
+
+                    var delta = Math.Abs(cRecibida - cPedida);
+                    if (delta <= 0) continue;
+
+                    var idArt = ReadInt(d, "idArticulo", "IdArticulo");
+                    var costo = ReadDecimal(d, "precioCosto", "PrecioCosto");
+                    var iva = ReadDecimal(d, "alicuotaIva", "AlicuotaIva");
+
+                    var cod = ""; var desc = ""; var mNombre = "";
+                    if (d.TryGetProperty("articulo", out var a) && a.ValueKind != JsonValueKind.Null)
+                    {
+                        if (a.TryGetProperty("codigoBarras", out var cb)) cod = cb.GetString() ?? "";
+                        else if (a.TryGetProperty("CodigoBarras", out var cb2)) cod = cb2.GetString() ?? "";
+                        if (a.TryGetProperty("descripcion", out var ds)) desc = ds.GetString() ?? "";
+                        else if (a.TryGetProperty("Descripcion", out var ds2)) desc = ds2.GetString() ?? "";
+                    }
+
+                    lineasDiferencias.Add(new NuevaOCLineaInicial(idArt, desc, cod, delta, costo, iva, idProv, provNombre, mNombre));
+                }
+            }
+
+            if (lineasDiferencias.Count == 0)
+            {
+                MessageBox.Show("No se detectaron diferencias entre lo pedido y lo recibido.", "Sin diferencias", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var dlg = new NuevaOCWindow(idProv, lineasDiferencias, idOcEdit: null, idOcOrigen: _idOC);
+            if (dlg.ShowDialog() == true)
+            {
+                await Cargar();
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error al generar OC por diferencias: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private async void BtnAnular_Click(object sender, RoutedEventArgs e)
@@ -523,6 +630,50 @@ public partial class DetalleOCWindow : Window
         catch (Exception ex)
         {
             MessageBox.Show($"Error: {ex.Message}");
+        }
+    }
+
+    private void TxtOriginalOcLink_Click(object sender, RoutedEventArgs e)
+    {
+        if (_idOcOriginal.HasValue)
+        {
+            var dlg = new DetalleOCWindow(_idOcOriginal.Value);
+            dlg.Owner = this;
+            dlg.ShowDialog();
+        }
+    }
+
+    private async void BtnConfirmarBorrador_Click(object sender, RoutedEventArgs e)
+    {
+        if (MessageBox.Show("¿Confirmar y enviar esta Orden de Compra?", "Confirmar Orden", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            return;
+
+        try
+        {
+            await App.Api.EnviarOrdenCompra(_idOC);
+            MessageBox.Show("Orden de compra confirmada y enviada con éxito.", "Éxito", MessageBoxButton.OK, MessageBoxImage.Information);
+            await Cargar();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error al confirmar la orden: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private async void BtnDevolver_Click(object sender, RoutedEventArgs e)
+    {
+        if (MessageBox.Show("¿Marcar esta Orden de Compra como devuelta al proveedor? Esto evitará que se reciba la mercadería.", "Confirmar Devolución", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            return;
+
+        try
+        {
+            await App.Api.DevolverOrdenCompra(_idOC);
+            MessageBox.Show("Orden de compra marcada como devuelta con éxito.", "Éxito", MessageBoxButton.OK, MessageBoxImage.Information);
+            await Cargar();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error al devolver la orden: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 

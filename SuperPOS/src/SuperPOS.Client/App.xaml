@@ -139,6 +139,30 @@
                                                           ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
                                                           Margin="8,4,0,4" VerticalAlignment="Center"
                                                           TextElement.Foreground="{TemplateBinding Foreground}"/>
+                                        <TextBox x:Name="PART_EditableTextBox"
+                                                 Background="Transparent"
+                                                 Foreground="{TemplateBinding Foreground}"
+                                                 BorderThickness="0"
+                                                 Margin="8,4,0,4"
+                                                 VerticalAlignment="Center"
+                                                 HorizontalAlignment="Stretch"
+                                                 Focusable="True"
+                                                 CaretBrush="#F0F0F0"
+                                                 Visibility="Collapsed">
+                                            <TextBox.Style>
+                                                <Style TargetType="TextBox">
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate TargetType="TextBox">
+                                                                <ScrollViewer x:Name="PART_ContentHost" Focusable="false" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden"/>
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                    <Setter Property="Foreground" Value="#F0F0F0"/>
+                                                    <Setter Property="Background" Value="Transparent"/>
+                                                </Style>
+                                            </TextBox.Style>
+                                        </TextBox>
                                         <Path Grid.Column="1" Data="M 0 0 L 4 4 L 8 0 Z"
                                               Fill="#A0A0A0" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </Grid>
@@ -174,6 +198,11 @@
                                 </Trigger>
                                 <Trigger Property="IsDropDownOpen" Value="True">
                                     <Setter TargetName="Bd" Property="BorderBrush" Value="#0078D4"/>
+                                </Trigger>
+                                <Trigger Property="IsEditable" Value="True">
+                                    <Setter Property="IsTabStop" Value="False"/>
+                                    <Setter TargetName="PART_EditableTextBox" Property="Visibility" Value="Visible"/>
+                                    <Setter TargetName="ContentSite" Property="Visibility" Value="Collapsed"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>

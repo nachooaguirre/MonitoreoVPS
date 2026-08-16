@@ -116,6 +116,17 @@
                             <DataGridTextColumn Header="Cód. prov." Binding="{Binding CodigoProveedor, UpdateSourceTrigger=PropertyChanged}" Width="80"/>
                             <DataGridTextColumn Header="Descripción" Binding="{Binding Descripcion, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
                             <DataGridTextColumn Header="P. unit." Binding="{Binding PrecioUnitario, StringFormat=F4}" Width="80"/>
+                            <DataGridTextColumn Header="Costo Act." Binding="{Binding CostoActual, StringFormat=F4}" IsReadOnly="True" Width="80"/>
+                            <DataGridTemplateColumn Header="Dif. %" IsReadOnly="True" Width="75">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding DiferenciaPorcentaje, StringFormat={}{0:+0.0;-0.0;0.0}%}" 
+                                                   Foreground="{Binding ColorDiferencia}" 
+                                                   FontWeight="SemiBold"
+                                                   VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,10,0"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
                             <DataGridTextColumn Header="IVA %" Binding="{Binding IvaPorcentaje, TargetNullValue=''}" Width="50"/>
                             <DataGridTextColumn Header="Bonif. (JSON)" Binding="{Binding BonificacionesJson, UpdateSourceTrigger=PropertyChanged}" Width="200"/>
                             <DataGridTextColumn Header="Id art." Binding="{Binding IdArticulo, TargetNullValue=''}" Width="56"/>

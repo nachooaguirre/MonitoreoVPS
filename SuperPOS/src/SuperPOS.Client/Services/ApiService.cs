@@ -34,7 +34,8 @@ public class ApiService
         int page = 1,
         int pageSize = 100,
         int? idFamilia = null,
-        bool incluirInactivos = false)
+        bool incluirInactivos = false,
+        bool aplicarOfertas = false)
     {
         var url = $"api/articulos?page={page}&pageSize={pageSize}";
         if (!string.IsNullOrWhiteSpace(buscar)) url += $"&buscar={Uri.EscapeDataString(buscar)}";
@@ -42,6 +43,7 @@ public class ApiService
         if (idProveedor.HasValue) url += $"&idProveedor={idProveedor.Value}";
         if (idFamilia is > 0) url += $"&idFamilia={idFamilia.Value}";
         if (incluirInactivos) url += "&incluirInactivos=true";
+        if (aplicarOfertas) url += "&aplicarOfertas=true";
         var resp = await _http.GetFromJsonAsync<PagedResult<Articulo>>(url, _json);
         return (resp?.Total ?? 0, resp?.Items ?? []);
     }
@@ -121,6 +123,39 @@ public class ApiService
     {
         var r = await _http.DeleteAsync($"api/articulos/{id}");
         r.EnsureSuccessStatusCode();
+    }
+
+    // === OFERTAS ===
+    public async Task<List<Oferta>?> GetOfertas()
+    {
+        try { return await _http.GetFromJsonAsync<List<Oferta>>("api/ofertas", _json); }
+        catch { return null; }
+    }
+
+    public async Task<Oferta?> CrearOferta(Oferta oferta)
+    {
+        var r = await _http.PostAsJsonAsync("api/ofertas", oferta, _json);
+        r.EnsureSuccessStatusCode();
+        return await r.Content.ReadFromJsonAsync<Oferta>(_json);
+    }
+
+    public async Task<Oferta?> ActualizarOferta(Oferta oferta)
+    {
+        var r = await _http.PutAsJsonAsync($"api/ofertas/{oferta.Id}", oferta, _json);
+        r.EnsureSuccessStatusCode();
+        return await r.Content.ReadFromJsonAsync<Oferta>(_json);
+    }
+
+    public async Task EliminarOferta(int id)
+    {
+        var r = await _http.DeleteAsync($"api/ofertas/{id}");
+        r.EnsureSuccessStatusCode();
+    }
+
+    public async Task<List<OfertaGraficaPunto>?> GetGraficaVentasOferta(int id)
+    {
+        try { return await _http.GetFromJsonAsync<List<OfertaGraficaPunto>>($"api/ofertas/grafica/{id}", _json); }
+        catch { return null; }
     }
 
     public async Task<List<HistorialPrecio>?> GetHistorialPrecios(int idArticulo)
@@ -246,23 +281,52 @@ public class ApiService
         var req = new { NombreUsuario = usuario, Password = password };
         var r = await _http.PostAsJsonAsync("api/usuarios/login", req);
         if (!r.IsSuccessStatusCode) return null;
-        return await r.Content.ReadFromJsonAsync<Usuario>(_json);
+
+        var resultado = await r.Content.ReadFromJsonAsync<LoginResponse>(_json);
+        if (resultado?.Token is not null)
+            _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", resultado.Token);
+
+        return resultado?.Usuario;
+    }
+
+    private class LoginResponse
+    {
+        public Usuario? Usuario { get; set; }
+        public string? Token { get; set; }
     }
 
     public async Task<List<Usuario>> GetUsuarios() =>
         await _http.GetFromJsonAsync<List<Usuario>>("api/usuarios?soloActivos=true", _json) ?? [];
 
-    public async Task<Usuario?> CrearUsuario(string nombreUsuario, string nombreCompleto, string password, int idPerfil, string? email, string? tel)
+    // === AUDITORÍA (solo admin) ===
+    public async Task<(int total, List<AuditLog> items)> GetAuditoria(
+        int? idUsuario = null, string? entidad = null, string? buscar = null,
+        DateTime? desde = null, DateTime? hasta = null, int page = 1, int pageSize = 100)
     {
-        var req = new { NombreUsuario = nombreUsuario, NombreCompleto = nombreCompleto, Password = password, IdPerfil = idPerfil, Email = email, Telefono = tel };
+        var url = $"api/auditoria?page={page}&pageSize={pageSize}";
+        if (idUsuario.HasValue) url += $"&idUsuario={idUsuario}";
+        if (!string.IsNullOrWhiteSpace(entidad)) url += $"&entidad={Uri.EscapeDataString(entidad)}";
+        if (!string.IsNullOrWhiteSpace(buscar)) url += $"&buscar={Uri.EscapeDataString(buscar)}";
+        if (desde.HasValue) url += $"&desde={desde:yyyy-MM-dd}";
+        if (hasta.HasValue) url += $"&hasta={hasta:yyyy-MM-dd}";
+        var resp = await _http.GetFromJsonAsync<PagedResult<AuditLog>>(url, _json);
+        return (resp?.Total ?? 0, resp?.Items ?? []);
+    }
+
+    public async Task<List<string>> GetAuditoriaEntidades() =>
+        await _http.GetFromJsonAsync<List<string>>("api/auditoria/entidades", _json) ?? [];
+
+    public async Task<Usuario?> CrearUsuario(string nombreUsuario, string nombreCompleto, string password, int idPerfil, string? email, string? tel, bool accesoZebra)
+    {
+        var req = new { NombreUsuario = nombreUsuario, NombreCompleto = nombreCompleto, Password = password, IdPerfil = idPerfil, Email = email, Telefono = tel, AccesoZebra = accesoZebra };
         var r = await _http.PostAsJsonAsync("api/usuarios", req);
         r.EnsureSuccessStatusCode();
         return await r.Content.ReadFromJsonAsync<Usuario>(_json);
     }
 
-    public async Task ActualizarUsuario(int id, string nombreCompleto, int idPerfil, bool activo, string? nuevaPassword, string? email, string? tel)
+    public async Task ActualizarUsuario(int id, string nombreCompleto, int idPerfil, bool activo, string? nuevaPassword, string? email, string? tel, bool accesoZebra)
     {
-        var req = new { NombreCompleto = nombreCompleto, IdPerfil = idPerfil, Activo = activo, NuevaPassword = nuevaPassword, Email = email, Telefono = tel };
+        var req = new { NombreCompleto = nombreCompleto, IdPerfil = idPerfil, Activo = activo, NuevaPassword = nuevaPassword, Email = email, Telefono = tel, AccesoZebra = accesoZebra };
         var r = await _http.PutAsJsonAsync($"api/usuarios/{id}", req);
         r.EnsureSuccessStatusCode();
     }
@@ -352,6 +416,17 @@ public class ApiService
 
     public async Task<StockBajoMinimoResult?> GetStockBajoMinimo() =>
         await _http.GetFromJsonAsync<StockBajoMinimoResult>("api/reportes/stock-bajo-minimo", _json);
+
+
+
+    public async Task<Comprobante?> GetVentaById(long id) =>
+        await _http.GetFromJsonAsync<Comprobante>($"api/ventas/{id}", _json);
+
+    public async Task AnularVenta(long id, int idUsuario)
+    {
+        var r = await _http.PostAsync($"api/ventas/{id}/anular?idUsuario={idUsuario}", null);
+        r.EnsureSuccessStatusCode();
+    }
 
     // === ZETAS (CIERRE DE CAJA) ===
     public async Task<ArqueoDto?> GetArqueoCaja(int idCaja) =>
@@ -490,6 +565,18 @@ public class ApiService
     public async Task AnularOrdenCompra(int id)
     {
         var r = await _http.PutAsJsonAsync($"api/ordenescompra/{id}/anular", new { });
+        r.EnsureSuccessStatusCode();
+    }
+
+    public async Task EnviarOrdenCompra(int id)
+    {
+        var r = await _http.PutAsJsonAsync($"api/ordenescompra/{id}/enviar", new { });
+        r.EnsureSuccessStatusCode();
+    }
+
+    public async Task DevolverOrdenCompra(int id)
+    {
+        var r = await _http.PutAsJsonAsync($"api/ordenescompra/{id}/devolver", new { });
         r.EnsureSuccessStatusCode();
     }
 
@@ -1036,6 +1123,42 @@ public class ApiService
     {
         var r = await _http.DeleteAsync($"api/cotizaciones/{id}");
         r.EnsureSuccessStatusCode();
+    }
+
+    // === CONTABILIDAD ===
+    public async Task<byte[]?> DownloadLibroIvaVentasCbte(int mes, int anio) =>
+        await DownloadBytes($"api/contabilidad/libro-iva-ventas-cbte?mes={mes}&anio={anio}");
+
+    public async Task<byte[]?> DownloadLibroIvaVentasAlic(int mes, int anio) =>
+        await DownloadBytes($"api/contabilidad/libro-iva-ventas-alic?mes={mes}&anio={anio}");
+
+    public async Task<byte[]?> DownloadLibroIvaComprasCbte(int mes, int anio) =>
+        await DownloadBytes($"api/contabilidad/libro-iva-compras-cbte?mes={mes}&anio={anio}");
+
+    public async Task<byte[]?> DownloadLibroIvaComprasAlic(int mes, int anio) =>
+        await DownloadBytes($"api/contabilidad/libro-iva-compras-alic?mes={mes}&anio={anio}");
+
+    public async Task<byte[]?> DownloadPercepcionesIvaVentas(int mes, int anio) =>
+        await DownloadBytes($"api/contabilidad/percepciones-iva-ventas?mes={mes}&anio={anio}");
+
+    public async Task<byte[]?> DownloadPercepcionesIIBBCompras(int mes, int anio) =>
+        await DownloadBytes($"api/contabilidad/percepciones-iibb-compras?mes={mes}&anio={anio}");
+
+    public async Task<byte[]?> DownloadResumenVentasCsv(int mes, int anio) =>
+        await DownloadBytes($"api/contabilidad/resumen-ventas-csv?mes={mes}&anio={anio}");
+
+    public async Task<byte[]?> DownloadResumenComprasCsv(int mes, int anio) =>
+        await DownloadBytes($"api/contabilidad/resumen-compras-csv?mes={mes}&anio={anio}");
+
+    private async Task<byte[]?> DownloadBytes(string url)
+    {
+        var resp = await _http.GetAsync(url);
+        if (resp.IsSuccessStatusCode)
+        {
+            return await resp.Content.ReadAsByteArrayAsync();
+        }
+        var errorContent = await resp.Content.ReadAsStringAsync();
+        throw new Exception(errorContent);
     }
 }
 

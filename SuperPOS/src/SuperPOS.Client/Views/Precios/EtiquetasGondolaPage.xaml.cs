@@ -160,13 +160,15 @@ namespace SuperPOS.Client.Views.Precios
                 try
                 {
                     var formatStr = (CmbFormato.SelectedItem as ComboBoxItem)?.Content.ToString() ?? "";
+                    bool isGondola = formatStr.Contains("Góndola");
                     bool isChica = formatStr.Contains("Chica");
 
                     // Formato física aproximado en Px (96 DPI)
+                    // Góndola: 60x30mm -> 227x113
                     // Chica: 50x30mm -> 189x113
                     // Grande: 80x40mm -> 302x151
-                    double width = isChica ? 189 : 302;
-                    double height = isChica ? 113 : 151;
+                    double width = isGondola ? 227 : (isChica ? 189 : 302);
+                    double height = (isGondola || isChica) ? 113 : 151;
 
                     var doc = new FixedDocument();
 
@@ -230,6 +232,13 @@ namespace SuperPOS.Client.Views.Precios
 
             // Borde externo
             dc.DrawRectangle(null, new Pen(Brushes.Black, 1.5), new Rect(1, 1, _width - 2, _height - 2));
+
+            // Si es formato Góndola (60mm x 30mm) -> _width == 227
+            if (Math.Abs(_width - 227) < 5)
+            {
+                RenderGondola(dc);
+                return;
+            }
 
             // Nombre Supermercado
             var titleFont = new FormattedText(
@@ -337,6 +346,123 @@ namespace SuperPOS.Client.Views.Precios
             );
             dc.DrawText(dateFont, new Point(_width - dateFont.Width - 6, _height - (_isChica ? 11 : 14)));
         }
+
+        private void RenderGondola(DrawingContext dc)
+        {
+            // 1. Descripción de artículo (en mayúsculas)
+            string desc = (_articulo?.Descripcion ?? "ARTICULO SIN DESCRIPCION").ToUpper();
+            var descFont = new FormattedText(
+                desc,
+                System.Globalization.CultureInfo.InvariantCulture,
+                FlowDirection.LeftToRight,
+                new Typeface(new FontFamily("Arial"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
+                10.5,
+                Brushes.Black,
+                VisualTreeHelper.GetDpi(this).PixelsPerDip
+            )
+            {
+                MaxTextWidth = _width - 16,
+                MaxTextHeight = 28
+            };
+            dc.DrawText(descFont, new Point(8, 4));
+
+            // 2. Precio Venta Grande
+            decimal precio = _articulo?.PrecioVenta ?? 0m;
+            var priceFont = new FormattedText(
+                $"$ {precio:N2}",
+                System.Globalization.CultureInfo.InvariantCulture,
+                FlowDirection.LeftToRight,
+                new Typeface(new FontFamily("Arial"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
+                32,
+                Brushes.Black,
+                VisualTreeHelper.GetDpi(this).PixelsPerDip
+            );
+            dc.DrawText(priceFont, new Point(8, 20));
+
+            // 3. Precio sin Impuestos
+            decimal alicuota = _articulo?.AlicuotaIva ?? 21m;
+            bool aplicaIva = _articulo?.AplicaIva ?? true;
+            decimal precioSinImp = aplicaIva ? (precio / (1 + (alicuota / 100m))) : precio;
+            var sinImpFont = new FormattedText(
+                $"Precio sin Imp.: $ {precioSinImp:F3}",
+                System.Globalization.CultureInfo.InvariantCulture,
+                FlowDirection.LeftToRight,
+                new Typeface(new FontFamily("Arial"), FontStyles.Normal, FontWeights.Normal, FontStretches.Normal),
+                8.5,
+                Brushes.Black,
+                VisualTreeHelper.GetDpi(this).PixelsPerDip
+            );
+            dc.DrawText(sinImpFont, new Point(24, 60));
+
+            // 4. Código numérico EAN y Barcode
+            string barcode = _articulo?.CodigoBarras ?? _articulo?.CodigoInterno ?? "0000000000000";
+            double barcodeX = 8;
+            double barcodeY = _height - 38;
+            double barcodeHeight = 18;
+            double barcodeWidth = 0.55; // narrowWidth más chico para que entre en 60mm
+
+            try
+            {
+                Code39BarcodeDrawer.DrawBarcode(dc, barcode, barcodeX, barcodeY, barcodeHeight, barcodeWidth);
+            }
+            catch { }
+
+            // Texto numérico del Barcode
+            var barcodeTextFont = new FormattedText(
+                barcode,
+                System.Globalization.CultureInfo.InvariantCulture,
+                FlowDirection.LeftToRight,
+                new Typeface("Arial"),
+                7.5,
+                Brushes.Black,
+                VisualTreeHelper.GetDpi(this).PixelsPerDip
+            );
+            dc.DrawText(barcodeTextFont, new Point(barcodeX + 6, _height - 14));
+
+            // 5. Precio por Kilo/Litro (si corresponde)
+            string valorReferenciaStr = "";
+            decimal contValor = _articulo?.ContenidoValor ?? 1m;
+            string contUnidad = _articulo?.ContenidoUnidad ?? "UN";
+
+            if (contValor > 0 && contUnidad != "UN")
+            {
+                if (contUnidad == "G")
+                {
+                    decimal pxKg = (precio * 1000m) / contValor;
+                    valorReferenciaStr = $"Kilo: {pxKg:F2}";
+                }
+                else if (contUnidad == "KG")
+                {
+                    decimal pxKg = precio / contValor;
+                    valorReferenciaStr = $"Kilo: {pxKg:F2}";
+                }
+                else if (contUnidad == "ML")
+                {
+                    decimal pxL = (precio * 1000m) / contValor;
+                    valorReferenciaStr = $"Litro: {pxL:F2}";
+                }
+                else if (contUnidad == "L")
+                {
+                    decimal pxL = precio / contValor;
+                    valorReferenciaStr = $"Litro: {pxL:F2}";
+                }
+            }
+
+            if (!string.IsNullOrEmpty(valorReferenciaStr))
+            {
+                var refFont = new FormattedText(
+                    valorReferenciaStr,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    FlowDirection.LeftToRight,
+                    new Typeface(new FontFamily("Arial"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
+                    9.5,
+                    Brushes.Black,
+                    VisualTreeHelper.GetDpi(this).PixelsPerDip
+                );
+                // Dibujar en la parte inferior derecha, alineado con el código de barras
+                dc.DrawText(refFont, new Point(_width - refFont.Width - 10, _height - 24));
+            }
+        }
     }
 
     // ===== DIBUJADOR DE BARCODE CODE 39 VECTORIAL =====
@@ -415,5 +541,9 @@ namespace SuperPOS.Client.Views.Precios
         public decimal PrecioVenta { get; set; }
         public decimal PrecioCosto { get; set; }
         public decimal StockActual { get; set; }
+        public decimal AlicuotaIva { get; set; } = 21m;
+        public bool AplicaIva { get; set; } = true;
+        public decimal ContenidoValor { get; set; } = 1m;
+        public string ContenidoUnidad { get; set; } = "UN";
     }
 }

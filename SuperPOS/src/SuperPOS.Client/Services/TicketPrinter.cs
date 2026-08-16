@@ -13,8 +13,13 @@ namespace SuperPOS.Client.Services;
 
 public static class TicketPrinter
 {
-    public static async Task ImprimirVenta(Comprobante cbte, List<ItemVenta> items, Cliente cliente, string? nombreImpresora, string? mensajePie = null)
+    public static async Task ImprimirVenta(Comprobante cbte, List<ItemVenta> items, Cliente cliente, string? nombreImpresora,
+        string? mensajePie = null, string? nombreEmpresa = null, string? cuitEmpresa = null, string? direccionEmpresa = null)
     {
+        nombreEmpresa ??= "MI EMPRESA";
+        cuitEmpresa ??= "00-00000000-0";
+        direccionEmpresa ??= "";
+
         // 1. Descarga del QR en segundo plano si está disponible
         byte[]? qrImageBytes = null;
         if (!string.IsNullOrEmpty(cbte.QrAfip))
@@ -30,9 +35,10 @@ public static class TicketPrinter
         // 2. Generar el texto formateado del ticket (límite estricto de 40 caracteres)
         var lineas = new List<string>();
         lineas.Add("========================================");
-        lineas.Add(CentrarText("LOS ANGELES SUPERMERCADOS", 40));
-        lineas.Add(CentrarText("CUIT: 30-00000000-0", 40));
-        lineas.Add(CentrarText("Casa Central - Bs.As.", 40));
+        lineas.Add(CentrarText(nombreEmpresa.ToUpperInvariant(), 40));
+        lineas.Add(CentrarText($"CUIT: {cuitEmpresa}", 40));
+        if (!string.IsNullOrWhiteSpace(direccionEmpresa))
+            lineas.Add(CentrarText(direccionEmpresa, 40));
         lineas.Add("========================================");
 
         string tipoComprobante = cbte.IdTipoComprobante switch
@@ -66,6 +72,18 @@ public static class TicketPrinter
         if (cbte.TotalIva105 > 0)
             lineas.Add($"IVA 10.5%:                     ${cbte.TotalIva105:N2}".PadLeft(40));
         lineas.Add($"TOTAL:                         ${cbte.Total:N2}".PadLeft(40));
+
+        if (cbte.Pagos != null)
+        {
+            foreach (var pago in cbte.Pagos)
+            {
+                if (!string.IsNullOrEmpty(pago.Referencia))
+                {
+                    lineas.Add(CentrarText(pago.Referencia, 40));
+                }
+            }
+        }
+
         lineas.Add("========================================");
 
         if (cbte.CAE.HasValue)
@@ -105,7 +123,7 @@ public static class TicketPrinter
 
                 foreach (var line in lineas)
                 {
-                    var activeFont = line.Contains("LOS ANGELES SUPERMERCADOS") || line.Contains("TOTAL:") ? boldFont : font;
+                    var activeFont = line.Contains(nombreEmpresa.ToUpperInvariant()) || line.Contains("TOTAL:") ? boldFont : font;
                     e.Graphics.DrawString(line, activeFont, Brushes.Black, 10, y);
                     y += lineSp;
                 }

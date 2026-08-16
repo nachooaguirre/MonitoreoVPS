@@ -17,6 +17,7 @@ public class ItemRecepcionVm
     public decimal PrecioCosto { get; set; }
     public string? LoteNro { get; set; }
     public DateTime? FechaVenc { get; set; }
+    public string? ObservacionDiferencia { get; set; }
 }
 
 public partial class RecibirPedidoWindow : Window
@@ -106,11 +107,17 @@ public partial class RecibirPedidoWindow : Window
             if (!TryGetArray(root, "detalles", "Detalles", out var detalles)) return;
 
             _items.Clear();
-            foreach (var det in detalles.EnumerateArray())
+            var detallesList = detalles.EnumerateArray().ToList();
+            var estadoOC = TryGetInt(root, "estado", "Estado");
+            bool wasAudited = (estadoOC == 2 || estadoOC == 3) || detallesList.Any(d => TryGetDecimal(d, "cantidadRecibida", "CantidadRecibida") > 0);
+
+            foreach (var det in detallesList)
             {
                 var idArt = TryGetInt(det, "idArticulo", "IdArticulo");
                 var cantPed = TryGetDecimal(det, "cantidadPedida", "CantidadPedida");
+                var cantRec = TryGetDecimal(det, "cantidadRecibida", "CantidadRecibida");
                 var precio = TryGetDecimal(det, "precioCosto", "PrecioCosto");
+                var obsDif = TryGetString(det, "observacionDiferencia", "ObservacionDiferencia");
                 var cod = "";
                 var desc = "";
                 if (TryGetObject(det, "articulo", "Articulo", out var art))
@@ -125,8 +132,9 @@ public partial class RecibirPedidoWindow : Window
                     CodigoBarras = cod,
                     Descripcion = desc,
                     CantidadPedida = cantPed,
-                    CantidadRecibida = cantPed,
-                    PrecioCosto = precio
+                    CantidadRecibida = wasAudited ? cantRec : cantPed,
+                    PrecioCosto = precio,
+                    ObservacionDiferencia = obsDif
                 });
             }
 

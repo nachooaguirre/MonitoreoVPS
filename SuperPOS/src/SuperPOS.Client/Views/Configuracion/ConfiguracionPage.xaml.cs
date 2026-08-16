@@ -56,6 +56,19 @@ public partial class ConfiguracionPage : Page
             ChkPrecioConIva.IsChecked  = _cfg.PrecioConIva;
             TxtBackupRuta.Text     = _cfg.BackupRuta ?? "";
 
+            // Cargar configuración de Pagos Integrados
+            ChkPosnetHabilitado.IsChecked = _cfg.PosnetHabilitado;
+            ChkMpqrHabilitado.IsChecked = _cfg.MpQrHabilitado;
+            TxtMpAccessToken.Text = _cfg.MpAccessToken ?? "";
+            TxtMpCollectorId.Text = _cfg.MpCollectorId ?? "";
+            TxtMpStoreId.Text = _cfg.MpStoreId ?? "";
+            TxtMpExternalPosId.Text = _cfg.MpExternalPosId ?? "";
+
+            var pPort = _cfg.PostnetPuertoCom ?? "SIMULADOR";
+            for (int i = 0; i < CboPosnetPuerto.Items.Count; i++)
+                if (((ComboBoxItem)CboPosnetPuerto.Items[i]).Content?.ToString() == pPort)
+                { CboPosnetPuerto.SelectedIndex = i; break; }
+
             // Impresora fiscal
             var modelo = _cfg.ImpresoraFiscalModelo ?? "";
             for (int i = 0; i < CboImpresoraFiscalModelo.Items.Count; i++)
@@ -103,6 +116,15 @@ public partial class ConfiguracionPage : Page
         _cfg.ControlaStock  = ChkControlaStock.IsChecked == true;
         _cfg.PrecioConIva   = ChkPrecioConIva.IsChecked == true;
         _cfg.BackupRuta     = TxtBackupRuta.Text.NullIfEmpty();
+
+        // Guardar configuración de Pagos Integrados
+        _cfg.PosnetHabilitado = ChkPosnetHabilitado.IsChecked == true;
+        _cfg.MpQrHabilitado = ChkMpqrHabilitado.IsChecked == true;
+        _cfg.MpAccessToken = TxtMpAccessToken.Text.NullIfEmpty();
+        _cfg.MpCollectorId = TxtMpCollectorId.Text.NullIfEmpty();
+        _cfg.MpStoreId = TxtMpStoreId.Text.NullIfEmpty();
+        _cfg.MpExternalPosId = TxtMpExternalPosId.Text.NullIfEmpty();
+        _cfg.PostnetPuertoCom = (CboPosnetPuerto.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "SIMULADOR";
 
         try
         {

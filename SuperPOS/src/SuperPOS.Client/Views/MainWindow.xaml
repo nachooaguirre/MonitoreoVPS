@@ -87,15 +87,15 @@
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition x:Name="RowTitleBar" Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0" MinHeight="32">
+        <Grid x:Name="GridTitleBar" Grid.Row="0" MinHeight="32">
             <ui:TitleBar x:Name="TitleBarRoot" Title="Los Angeles Supermercados — SuperPOS"/>
             <!-- Alineado al margen con espacio reservado para Min / Max / Cerrar (ExtendsContentIntoTitleBar) -->
             <StackPanel x:Name="PanelCampana" HorizontalAlignment="Right" VerticalAlignment="Center" Orientation="Horizontal"
-                        Margin="0,0,132,0" Panel.ZIndex="2" IsHitTestVisible="True"
+                        Margin="0,0,132,0" Panel.ZIndex="2" IsHitTestVisible="True" Visibility="Collapsed"
                         ToolTip="Alertas: artículos con stock actual ≤ stock mínimo (definido en ficha)">
                 <Button x:Name="BtnAlertasStock" Style="{StaticResource BarIconBtn}" Padding="6,2" MinWidth="40" Height="30" Click="BtnAlertasStock_Click"
                         Cursor="Hand" ToolTip="Alertas de stock bajo mínimo">
@@ -155,16 +155,21 @@
 
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="200"/>
+                <ColumnDefinition x:Name="ColSidebar" Width="200"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
             <!-- ===== BARRA LATERAL ===== -->
-            <Border Grid.Column="0" Background="#1C1C1C" BorderThickness="0,0,1,0" BorderBrush="#303030">
-                <DockPanel LastChildFill="False">
+            <Border x:Name="SidebarBorder" Grid.Column="0" Background="#1C1C1C" BorderThickness="0,0,1,0" BorderBrush="#303030">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
                     <!-- Logo -->
-                    <Border DockPanel.Dock="Top" Padding="8,12,8,8" BorderThickness="0,0,0,1" BorderBrush="#303030">
+                    <Border Grid.Row="0" Padding="8,12,8,8" BorderThickness="0,0,0,1" BorderBrush="#303030">
                         <StackPanel>
                             <Image x:Name="ImgLogoNav" MaxHeight="52" Stretch="Uniform"
                                    RenderOptions.BitmapScalingMode="HighQuality"
@@ -176,38 +181,44 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- OPERACIONES -->
-                    <StackPanel DockPanel.Dock="Top" Margin="0,6,0,0">
-                        <TextBlock Style="{StaticResource NavSection}" Text="OPERACIONES"/>
-                        <Button x:Name="BtnCaja"        Content="🛒  Caja / Ventas"    Style="{StaticResource NavBtn}" Tag="caja"        Click="NavButton_Click"/>
-                        <Button x:Name="BtnArticulos"   Content="🏷️  Artículos"         Style="{StaticResource NavBtn}" Tag="articulos"   Click="NavButton_Click"/>
-                        <Button x:Name="BtnClientes"    Content="👤  Clientes"          Style="{StaticResource NavBtn}" Tag="clientes"    Click="NavButton_Click"/>
-                        <Button x:Name="BtnProveedores" Content="🏢  Proveedores"       Style="{StaticResource NavBtn}" Tag="proveedores" Click="NavButton_Click"/>
-                        <Button x:Name="BtnPresupuestos" Content="📋  Presupuestos"      Style="{StaticResource NavBtn}" Tag="presupuestos" Click="NavButton_Click"/>
-                        <Button x:Name="BtnCotizaciones" Content="📑  Cotizaciones Proveedores" Style="{StaticResource NavBtn}" Tag="cotizaciones" Click="NavButton_Click"/>
+                    <!-- Menú Scrollable -->
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Margin="0,6,0,6">
+                            <!-- OPERACIONES -->
+                            <TextBlock Style="{StaticResource NavSection}" Text="OPERACIONES"/>
+                            <Button x:Name="BtnCaja"        Content="🛒  Caja / Ventas"    Style="{StaticResource NavBtn}" Tag="caja"        Click="NavButton_Click"/>
+                            <Button x:Name="BtnArticulos"   Content="🏷️  Artículos"         Style="{StaticResource NavBtn}" Tag="articulos"   Click="NavButton_Click"/>
+                            <Button x:Name="BtnOfertas"     Content="🔥  Ofertas Especiales" Style="{StaticResource NavBtn}" Tag="ofertas"      Click="NavButton_Click"/>
+                            <Button x:Name="BtnClientes"    Content="👤  Clientes"          Style="{StaticResource NavBtn}" Tag="clientes"    Click="NavButton_Click"/>
+                            <Button x:Name="BtnProveedores" Content="🏢  Proveedores"       Style="{StaticResource NavBtn}" Tag="proveedores" Click="NavButton_Click"/>
+                            <Button x:Name="BtnPresupuestos" Content="📋  Presupuestos"      Style="{StaticResource NavBtn}" Tag="presupuestos" Click="NavButton_Click"/>
 
-                        <TextBlock Style="{StaticResource NavSection}" Text="INVENTARIO"/>
-                        <Button x:Name="BtnOrdenesCompra" Content="📋  Órdenes Compra"    Style="{StaticResource NavBtn}" Tag="ordenescompra"  Click="NavButton_Click"/>
-                        <Button x:Name="BtnTarifasProveedor" Content="📑  Listas de precio"  Style="{StaticResource NavBtn}" Tag="tarifasproveedor" Click="NavButton_Click"/>
-                        <Button x:Name="BtnEtiquetas"     Content="🏷️  Imprimir Etiquetas" Style="{StaticResource NavBtn}" Tag="etiquetas"     Click="NavButton_Click"/>
-                        <Button x:Name="BtnRemitos"       Content="📄  Remitos"            Style="{StaticResource NavBtn}" Tag="remitos"        Click="NavButton_Click"/>
-                        <Button x:Name="BtnInventario"    Content="🔍  Inventario Físico"  Style="{StaticResource NavBtn}" Tag="inventario"     Click="NavButton_Click"/>
-                        <Button x:Name="BtnStock"         Content="📊  Stock"              Style="{StaticResource NavBtn}" Tag="stock"         Click="NavButton_Click"/>
-                        <Button x:Name="BtnTrazabilidad"  Content="🔍  Trazabilidad"       Style="{StaticResource NavBtn}" Tag="trazabilidad"  Click="NavButton_Click"/>
-                        <Button x:Name="BtnCtaCte"        Content="💳  Cta. Corriente"     Style="{StaticResource NavBtn}" Tag="ctacte"        Click="NavButton_Click"/>
+                            <TextBlock Style="{StaticResource NavSection}" Text="INVENTARIO"/>
+                            <Button x:Name="BtnOrdenesCompra" Content="📋  Órdenes Compra"    Style="{StaticResource NavBtn}" Tag="ordenescompra"  Click="NavButton_Click"/>
+                            <Button x:Name="BtnTarifasProveedor" Content="📑  Listas de precio"  Style="{StaticResource NavBtn}" Tag="tarifasproveedor" Click="NavButton_Click"/>
+                            <Button x:Name="BtnEtiquetas"     Content="🏷️  Imprimir Etiquetas" Style="{StaticResource NavBtn}" Tag="etiquetas"     Click="NavButton_Click"/>
+                            <Button x:Name="BtnRemitos"       Content="📄  Remitos"            Style="{StaticResource NavBtn}" Tag="remitos"        Click="NavButton_Click"/>
+                            <Button x:Name="BtnInventario"    Content="🔍  Inventario Físico"  Style="{StaticResource NavBtn}" Tag="inventario"     Click="NavButton_Click"/>
+                            <Button x:Name="BtnStock"         Content="📊  Stock"              Style="{StaticResource NavBtn}" Tag="stock"         Click="NavButton_Click"/>
+                            <Button x:Name="BtnTrazabilidad"  Content="🔍  Trazabilidad"       Style="{StaticResource NavBtn}" Tag="trazabilidad"  Click="NavButton_Click"/>
+                            <Button x:Name="BtnCtaCte"        Content="💳  Cta. Corriente"     Style="{StaticResource NavBtn}" Tag="ctacte"        Click="NavButton_Click"/>
 
-                        <TextBlock Style="{StaticResource NavSection}" Text="FINANZAS"/>
-                        <Button x:Name="BtnTesoreria"   Content="🏦  Tesorería"          Style="{StaticResource NavBtn}" Tag="tesoreria"     Click="NavButton_Click"/>
-                        <TextBlock Style="{StaticResource NavSection}" Text="ANÁLISIS"/>
-                        <Button x:Name="BtnReportes"    Content="📈  Reportes"           Style="{StaticResource NavBtn}" Tag="reportes"      Click="NavButton_Click"/>
-                        <Button x:Name="BtnAi"          Content="🤖  Asistente IA"       Style="{StaticResource NavBtn}" Tag="ai"            Click="NavButton_Click"
-                                Foreground="#7AAAE0"/>
-                    </StackPanel>
+                            <TextBlock Style="{StaticResource NavSection}" Text="FINANZAS"/>
+                            <Button x:Name="BtnTesoreria"   Content="🏦  Tesorería"          Style="{StaticResource NavBtn}" Tag="tesoreria"     Click="NavButton_Click"/>
+                            
+                            <TextBlock Style="{StaticResource NavSection}" Text="ANÁLISIS"/>
+                            <Button x:Name="BtnReportes"    Content="📈  Reportes"           Style="{StaticResource NavBtn}" Tag="reportes"      Click="NavButton_Click"/>
+                            <Button x:Name="BtnContabilidad" Content="🏛️  Contabilidad"       Style="{StaticResource NavBtn}" Tag="contabilidad"  Click="NavButton_Click"/>
+                            <Button x:Name="BtnAi"          Content="🤖  Asistente IA"       Style="{StaticResource NavBtn}" Tag="ai"            Click="NavButton_Click"
+                                    Foreground="#7AAAE0"/>
+                        </StackPanel>
+                    </ScrollViewer>
 
                     <!-- Administración (abajo) -->
-                    <StackPanel DockPanel.Dock="Bottom" Margin="0,0,0,10">
+                    <StackPanel Grid.Row="2" Margin="0,0,0,10">
                         <Border BorderThickness="0,1,0,0" BorderBrush="#303030" Margin="8,6"/>
                         <Button x:Name="BtnUsuarios"    Content="👥  Usuarios"          Style="{StaticResource NavBtn}" Tag="usuarios"    Click="NavButton_Click"/>
+                        <Button x:Name="BtnAuditoria"   Content="🛡️  Auditoría"         Style="{StaticResource NavBtn}" Tag="auditoria"   Click="NavButton_Click"/>
                         <Button x:Name="BtnConfig"      Content="⚙️  Configuración"     Style="{StaticResource NavBtn}" Tag="configuracion" Click="NavButton_Click"/>
                         <Button x:Name="BtnLogout"      Style="{StaticResource NavBtn}" Tag="logout"     Click="NavButton_Click"
                                 Foreground="#FF7070" FocusVisualStyle="{x:Null}">
@@ -237,7 +248,7 @@
                                        Foreground="#FF7070" FontSize="13.5"/>
                         </Button>
                     </StackPanel>
-                </DockPanel>
+                </Grid>
             </Border>
 
             <Frame x:Name="ContentFrame" Grid.Column="1" NavigationUIVisibility="Hidden"

@@ -52,7 +52,10 @@
                     <ui:PasswordBox x:Name="TxtPasswordConfirm" PlaceholderText="Repetir contraseña"/>
                 </StackPanel>
             </Grid>
-            <CheckBox x:Name="ChkActivo" Content="Usuario activo" IsChecked="True" Margin="0,16,0,0"/>
+            <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                <CheckBox x:Name="ChkActivo" Content="Usuario activo" IsChecked="True" Margin="0,0,24,0"/>
+                <CheckBox x:Name="ChkAccesoZebra" Content="Acceso a Colectoras Zebra" IsChecked="False"/>
+            </StackPanel>
         </StackPanel>
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="20,12">
             <Button Content="Cancelar" Width="100" Height="36" Margin="0,0,8,0" Click="BtnCancelar_Click"/>
