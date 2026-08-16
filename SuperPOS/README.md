@@ -230,3 +230,41 @@ La idea es cerrar estas respuestas hoy o dejar pendientes con prioridad.
 - Migraciones EF viven en `SuperPOS/src/SuperPOS.API/Migrations`.
 - En esta iteración se agregó: `AddTrazabilidadEventos`.
 
+---
+
+## Despliegue en la PC del cliente
+
+### Arquitectura de instalación (un solo local)
+
+- **Una PC "servidor"**: corre PostgreSQL + `SuperPOS.API` (como Windows Service, ver abajo). IP fija en la red del local.
+- **Cada caja**: solo `SuperPOS.Client`, con `appsettings.json` → `ApiBaseUrl` apuntando a `http://IP-DEL-SERVIDOR:5075`.
+- Abrir el puerto 5075 en el Firewall de Windows de la PC servidor (regla de entrada, TCP).
+
+### Publicar los binarios
+
+```bash
+dotnet publish SuperPOS/src/SuperPOS.API/SuperPOS.API.csproj -c Release -r win-x64 --self-contained -o publish/api
+dotnet publish SuperPOS/src/SuperPOS.Client/SuperPOS.Client.csproj -c Release -r win-x64 --self-contained -o publish/client
+```
+
+### Instalar la API como Windows Service (PC servidor)
+
+El proyecto ya soporta correr como servicio (`UseWindowsService()` en `Program.cs`) — sobrevive a reinicios y a que alguien cierre sesión, a diferencia de correrlo como consola. Instalación (PowerShell como Administrador, una sola vez):
+
+```powershell
+sc.exe create "SuperPOS API" binPath= "C:\ruta\publish\api\SuperPOS.API.exe" start= auto
+sc.exe description "SuperPOS API" "API central de SuperPOS (ventas, stock, AFIP)"
+sc.exe start "SuperPOS API"
+```
+
+Para desinstalar: `sc.exe stop "SuperPOS API"` seguido de `sc.exe delete "SuperPOS API"`.
+
+### Variables de entorno requeridas (no van en appsettings.json commiteado)
+
+Configurar en la PC servidor antes de instalar el servicio (`setx VARIABLE valor /M`, requiere reabrir sesión):
+
+- `ConnectionStrings__DefaultConnection` — cadena de conexión a Postgres con el usuario/password reales.
+- `Jwt__Secret` — secreto de firma JWT (generar uno propio por instalación, no reusar el de desarrollo).
+- `Afip__PasswordCertificado` — password del certificado `.p12` de AFIP.
+- `DeepSeek__ApiKey` — si se usa el asistente de IA.
+

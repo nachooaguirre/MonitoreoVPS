@@ -14,3 +14,22 @@ IDR/
 descompilado/
 LA - Supermer*/
 LoginMarketNewAge*/
+
+# Secretos locales (connection strings, API keys, JWT secret) — nunca a git
+appsettings.Development.json
+appsettings.Local.json
+appsettings.*.local.json
+
+# Android / Gradle (SuperPOS.Android)
+**/SuperPOS.Android/**/.gradle/
+**/SuperPOS.Android/**/build/
+**/SuperPOS.Android/.idea/
+**/SuperPOS.Android/.kotlin/
+**/SuperPOS.Android/**/local.properties
+**/SuperPOS.Android/**/*.iml
+**/SuperPOS.Android/captures/
+**/SuperPOS.Android/**/.externalNativeBuild/
+**/SuperPOS.Android/**/.cxx/
+
+# Datos reales del cliente (CUIT, ventas, compras) usados para validar el exportador contable
+documentos_contabilidad/

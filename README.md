@@ -1,2 +1,0 @@
-# SuperPOS
-# SuperPOS
