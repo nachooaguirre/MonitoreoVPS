@@ -9,13 +9,27 @@ public class Compra
     public DateTime? FechaVencimiento { get; set; }
     public string? NumeroFactura { get; set; }         // Número de factura del proveedor
     public string? LetraFactura { get; set; }
+    public int IdTipoComprobante { get; set; }
     public EstadoCompra Estado { get; set; } = EstadoCompra.Pendiente;
     public decimal SubTotal { get; set; }
     public decimal TotalIva { get; set; }
+    public decimal PercepcionIva { get; set; }
+    public decimal PercepcionNacional { get; set; }
+    public decimal PercepcionIIBB { get; set; }
+    public decimal PercepcionMunicipal { get; set; }
+    public decimal ImpuestosInternos { get; set; }
+    public decimal ImporteNoGravado { get; set; }
+    public decimal ImporteExento { get; set; }
+    public int PuntoVentaProveedor { get; set; }
+    public string? DespachoImportacion { get; set; }
+    public decimal IvaComision { get; set; }
+    public string? CuitCorredor { get; set; }
+    public string? NombreCorredor { get; set; }
     public decimal Total { get; set; }
     public string? Observaciones { get; set; }
 
     public Proveedor? Proveedor { get; set; }
+    public TipoComprobante? TipoComprobante { get; set; }
     public ICollection<CompraDetalle> Detalles { get; set; } = [];
 }
 

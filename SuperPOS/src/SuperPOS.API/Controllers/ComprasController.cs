@@ -76,6 +76,24 @@ public class ComprasController(SuperPOSDbContext db) : ControllerBase
         }
 
         compra.Estado = EstadoCompra.Recibida;
+
+        var proveedor = await db.Proveedores.FindAsync(compra.IdProveedor);
+        if (proveedor != null && compra.Total > 0)
+        {
+            proveedor.SaldoCtaCte += compra.Total;
+            db.MovimientosCtaCteProveedor.Add(new MovimientoCtaCteProveedor
+            {
+                IdProveedor = compra.IdProveedor,
+                Fecha = DateTime.UtcNow,
+                Tipo = TipoMovimientoCteProveedor.CompraCredito,
+                Concepto = $"Compra {compra.LetraFactura}{compra.NumeroFactura}".Trim(),
+                IdCompra = compra.Id,
+                Debe = compra.Total,
+                Haber = 0,
+                SaldoAcumulado = proveedor.SaldoCtaCte
+            });
+        }
+
         await db.SaveChangesAsync();
         return NoContent();
     }

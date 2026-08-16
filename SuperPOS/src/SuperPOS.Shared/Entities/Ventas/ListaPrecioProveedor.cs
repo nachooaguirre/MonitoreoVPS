@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace SuperPOS.Shared.Entities.Ventas;
 
 /// <summary>
@@ -35,4 +37,20 @@ public class ListaPrecioProveedorLinea
 
     public ListaPrecioProveedor? Lista { get; set; }
     public Articulo? Articulo { get; set; }
+
+    [JsonIgnore]
+    public decimal? CostoActual => Articulo?.PrecioCosto;
+
+    [JsonIgnore]
+    public decimal? DiferenciaPorcentaje => (Articulo == null || Articulo.PrecioCosto == 0)
+        ? null
+        : ((PrecioUnitario - Articulo.PrecioCosto) / Articulo.PrecioCosto) * 100;
+
+    [JsonIgnore]
+    public string ColorDiferencia => DiferenciaPorcentaje switch
+    {
+        > 0.1m => "#FFA0A0",
+        < -0.1m => "#A0FFA0",
+        _ => "#E0E8F0"
+    };
 }

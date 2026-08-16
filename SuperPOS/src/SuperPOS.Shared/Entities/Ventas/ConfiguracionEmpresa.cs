@@ -24,4 +24,13 @@ public class ConfiguracionEmpresa
     public bool ControlaStock { get; set; } = true;
     public bool PrecioConIva { get; set; } = true;
     public string? BackupRuta { get; set; }
+
+    // Métodos de Pago Integrado
+    public bool PosnetHabilitado { get; set; } = false;
+    public string PostnetPuertoCom { get; set; } = "SIMULADOR";
+    public bool MpQrHabilitado { get; set; } = false;
+    public string? MpAccessToken { get; set; }
+    public string? MpCollectorId { get; set; }
+    public string? MpStoreId { get; set; }
+    public string? MpExternalPosId { get; set; }
 }

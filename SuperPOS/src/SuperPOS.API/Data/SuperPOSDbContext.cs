@@ -1,10 +1,14 @@
+using System.Security.Claims;
+using System.Text.Json;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using SuperPOS.Shared.Entities.Ventas;
 using SuperPOS.Shared.Entities.Ventas.Legacy;
 
 namespace SuperPOS.API.Data;
 
-public class SuperPOSDbContext(DbContextOptions<SuperPOSDbContext> options) : DbContext(options)
+public class SuperPOSDbContext(DbContextOptions<SuperPOSDbContext> options, IHttpContextAccessor? httpContextAccessor = null) : DbContext(options)
 {
     public DbSet<Articulo> Articulos => Set<Articulo>();
     public DbSet<ArticuloCodigoBarras> ArticulosCodigoBarras => Set<ArticuloCodigoBarras>();
@@ -26,6 +30,9 @@ public class SuperPOSDbContext(DbContextOptions<SuperPOSDbContext> options) : Db
     public DbSet<Compra> Compras => Set<Compra>();
     public DbSet<CompraDetalle> ComprasDetalle => Set<CompraDetalle>();
     public DbSet<MovimientoCtaCte> MovimientosCtaCte => Set<MovimientoCtaCte>();
+    public DbSet<MovimientoCtaCteProveedor> MovimientosCtaCteProveedor => Set<MovimientoCtaCteProveedor>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<ComprobanteAfipLog> ComprobantesAfipLog => Set<ComprobanteAfipLog>();
     public DbSet<ConfiguracionEmpresa> ConfiguracionEmpresa => Set<ConfiguracionEmpresa>();
     public DbSet<Zeta> Zetas => Set<Zeta>();
     public DbSet<ZetaDetalleMedio> ZetasDetalleMedio => Set<ZetaDetalleMedio>();
@@ -66,6 +73,7 @@ public class SuperPOSDbContext(DbContextOptions<SuperPOSDbContext> options) : Db
     public DbSet<MonedaPlan> MonedasPlanes => Set<MonedaPlan>();
     public DbSet<ArticuloDatoAdicional> ArticulosDatosAdicionales => Set<ArticuloDatoAdicional>();
     public DbSet<EtiquetaCola> EtiquetasCola => Set<EtiquetaCola>();
+    public DbSet<Oferta> Ofertas => Set<Oferta>();
 
     // Tablas Legacy
     public DbSet<Auditoria> Auditorias => Set<Auditoria>();
@@ -93,6 +101,94 @@ public class SuperPOSDbContext(DbContextOptions<SuperPOSDbContext> options) : Db
     public DbSet<POS_Rendicion> POS_Rendiciones => Set<POS_Rendicion>();
     public DbSet<POS_Tecla> POS_Teclas => Set<POS_Tecla>();
     public DbSet<POS_Video> POS_Videos => Set<POS_Video>();
+
+    /// <summary>
+    /// Namespaces/entidades que no se auditan: el propio AuditLog (evita recursión) y las tablas
+    /// Legacy de Tecnolar (el importador masivo generaría miles de filas de ruido sin valor).
+    /// </summary>
+    private static bool EsAuditable(EntityEntry entry) =>
+        entry.Entity is not AuditLog
+        && entry.Entity.GetType().Namespace != typeof(CajeroLegacy).Namespace;
+
+    public override int SaveChanges() => SaveChangesAsync().GetAwaiter().GetResult();
+
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        var pendientes = ChangeTracker.Entries()
+            .Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+            .Where(EsAuditable)
+            .ToList();
+
+        // Para "Added" el PK todavía no existe (lo asigna la DB); armamos el AuditLog después del SaveChanges real.
+        var pendientesInfo = pendientes.Select(e => new
+        {
+            Entry = e,
+            e.State,
+            Cambios = e.State == EntityState.Modified
+                ? e.Properties.Where(p => !Equals(p.OriginalValue, p.CurrentValue))
+                    .ToDictionary(p => p.Metadata.Name, p => new { anterior = p.OriginalValue, nuevo = p.CurrentValue })
+                : null
+        }).ToList();
+
+        var result = await base.SaveChangesAsync(cancellationToken);
+
+        if (pendientesInfo.Count > 0)
+        {
+            var (idUsuario, nombreUsuario) = ObtenerUsuarioActual();
+            var ahora = DateTime.UtcNow;
+
+            foreach (var p in pendientesInfo)
+            {
+                if (p.State == EntityState.Modified && (p.Cambios is null || p.Cambios.Count == 0))
+                    continue; // Nada realmente cambió (ej. SaveChanges llamado sin modificaciones reales)
+
+                var tipo = p.State switch
+                {
+                    EntityState.Added => TipoAccionAuditoria.Creacion,
+                    EntityState.Deleted => TipoAccionAuditoria.Eliminacion,
+                    _ => TipoAccionAuditoria.Modificacion
+                };
+
+                var pk = string.Join(",", p.Entry.Properties.Where(x => x.Metadata.IsPrimaryKey()).Select(x => x.CurrentValue));
+                var entidad = p.Entry.Entity.GetType().Name;
+
+                string? cambiosJson = null;
+                string? descripcion = null;
+                if (p.State == EntityState.Modified && p.Cambios != null)
+                {
+                    cambiosJson = JsonSerializer.Serialize(p.Cambios);
+                    descripcion = string.Join("; ", p.Cambios.Select(c => $"{c.Key}: {c.Value.anterior} -> {c.Value.nuevo}"));
+                    if (descripcion.Length > 950) descripcion = descripcion[..950] + "…";
+                }
+
+                AuditLogs.Add(new AuditLog
+                {
+                    Fecha = ahora,
+                    IdUsuario = idUsuario,
+                    NombreUsuario = nombreUsuario,
+                    Entidad = entidad,
+                    EntidadId = pk,
+                    Accion = tipo,
+                    Descripcion = descripcion,
+                    CambiosJson = cambiosJson
+                });
+            }
+
+            await base.SaveChangesAsync(cancellationToken);
+        }
+
+        return result;
+    }
+
+    private (int? idUsuario, string? nombreUsuario) ObtenerUsuarioActual()
+    {
+        var user = httpContextAccessor?.HttpContext?.User;
+        if (user?.Identity?.IsAuthenticated != true) return (null, null);
+
+        var idStr = user.FindFirstValue(ClaimTypes.NameIdentifier);
+        var nombre = user.FindFirstValue(ClaimTypes.Name);
+        return (int.TryParse(idStr, out var id) ? id : null, nombre);
+    }
 
     protected override void OnModelCreating(ModelBuilder m)
     {
@@ -134,6 +230,10 @@ public class SuperPOSDbContext(DbContextOptions<SuperPOSDbContext> options) : Db
             e.HasOne(x => x.Familia).WithMany().HasForeignKey(x => x.IdFamilia).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Marca).WithMany().HasForeignKey(x => x.IdMarca).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Proveedor).WithMany().HasForeignKey(x => x.IdProveedor).OnDelete(DeleteBehavior.Restrict);
+            e.Property(x => x.MultiplicadorStock).HasColumnType("decimal(18,3)").HasDefaultValue(1m);
+            e.HasOne(x => x.ArticuloPadre).WithMany().HasForeignKey(x => x.IdArticuloPadre).OnDelete(DeleteBehavior.Restrict);
+            e.Property(x => x.ContenidoValor).HasColumnType("decimal(18,4)").HasDefaultValue(1m);
+            e.Property(x => x.ContenidoUnidad).HasMaxLength(10).HasDefaultValue("UN");
         });
 
         m.Entity<ArticuloCodigoBarras>(e =>
@@ -148,6 +248,17 @@ public class SuperPOSDbContext(DbContextOptions<SuperPOSDbContext> options) : Db
         {
             e.HasKey(x => x.Id);
             e.HasOne(x => x.Articulo).WithMany().HasForeignKey(x => x.IdArticulo).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        m.Entity<Oferta>(e =>
+        {
+            e.ToTable("Ofertas");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.PrecioOferta).HasColumnType("decimal(18,4)");
+            e.Property(x => x.LimiteStock).HasColumnType("decimal(18,3)");
+            e.Property(x => x.CantidadVendida).HasColumnType("decimal(18,3)");
+            e.HasOne(x => x.Articulo).WithMany().HasForeignKey(x => x.IdArticulo).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => new { x.IdArticulo, x.FechaDesde, x.FechaHasta, x.Activa });
         });
 
         m.Entity<TrazabilidadEvento>(e =>
@@ -195,11 +306,24 @@ public class SuperPOSDbContext(DbContextOptions<SuperPOSDbContext> options) : Db
             e.Property(x => x.TotalIva105).HasColumnType("decimal(18,2)");
             e.Property(x => x.TotalIva0).HasColumnType("decimal(18,2)");
             e.Property(x => x.Total).HasColumnType("decimal(18,2)");
+            e.Property(x => x.Comision).HasColumnType("decimal(18,2)");
             e.HasOne(x => x.Cliente).WithMany().HasForeignKey(x => x.IdCliente).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Proveedor).WithMany().HasForeignKey(x => x.IdProveedor).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.TipoComprobante).WithMany().HasForeignKey(x => x.IdTipoComprobante).OnDelete(DeleteBehavior.Restrict);
-            e.HasIndex(x => new { x.IdSucursal, x.PuntoVenta, x.Numero, x.Letra }).IsUnique();
+            // La numeración AFIP es independiente POR TIPO de comprobante (CbteTipo), aunque compartan
+            // letra: Factura B (6) y Nota de Crédito B (8) llevan cada una su propia secuencia 1,2,3...
+            // No incluir IdTipoComprobante acá permitía que se pisaran entre sí.
+            e.HasIndex(x => new { x.IdSucursal, x.PuntoVenta, x.IdTipoComprobante, x.Numero, x.Letra }).IsUnique();
             e.HasIndex(x => x.Fecha);
             e.HasIndex(x => x.IdCliente);
+        });
+
+        m.Entity<ComprobanteAfipLog>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Detalle).HasMaxLength(2000);
+            e.HasOne(x => x.Comprobante).WithMany().HasForeignKey(x => x.IdComprobante).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => x.IdComprobante);
         });
 
         m.Entity<ComprobanteDetalle>(e =>
@@ -268,8 +392,20 @@ public class SuperPOSDbContext(DbContextOptions<SuperPOSDbContext> options) : Db
             e.HasKey(x => x.Id);
             e.Property(x => x.SubTotal).HasColumnType("decimal(18,2)");
             e.Property(x => x.TotalIva).HasColumnType("decimal(18,2)");
+            e.Property(x => x.PercepcionIva).HasColumnType("decimal(18,2)");
+            e.Property(x => x.PercepcionNacional).HasColumnType("decimal(18,2)");
+            e.Property(x => x.PercepcionIIBB).HasColumnType("decimal(18,2)");
+            e.Property(x => x.PercepcionMunicipal).HasColumnType("decimal(18,2)");
+            e.Property(x => x.ImpuestosInternos).HasColumnType("decimal(18,2)");
+            e.Property(x => x.ImporteNoGravado).HasColumnType("decimal(18,2)");
+            e.Property(x => x.ImporteExento).HasColumnType("decimal(18,2)");
+            e.Property(x => x.IvaComision).HasColumnType("decimal(18,2)");
+            e.Property(x => x.CuitCorredor).HasMaxLength(20);
+            e.Property(x => x.NombreCorredor).HasMaxLength(150);
+            e.Property(x => x.DespachoImportacion).HasMaxLength(50);
             e.Property(x => x.Total).HasColumnType("decimal(18,2)");
             e.HasOne(x => x.Proveedor).WithMany().HasForeignKey(x => x.IdProveedor).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.TipoComprobante).WithMany().HasForeignKey(x => x.IdTipoComprobante).OnDelete(DeleteBehavior.Restrict);
             e.HasMany(x => x.Detalles).WithOne(d => d.Compra).HasForeignKey(d => d.IdCompra).OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -294,6 +430,29 @@ public class SuperPOSDbContext(DbContextOptions<SuperPOSDbContext> options) : Db
             e.Property(x => x.SaldoAcumulado).HasColumnType("decimal(18,2)");
             e.HasOne(x => x.Cliente).WithMany().HasForeignKey(x => x.IdCliente).OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(x => new { x.IdCliente, x.Fecha });
+        });
+
+        m.Entity<MovimientoCtaCteProveedor>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Concepto).HasMaxLength(250);
+            e.Property(x => x.Debe).HasColumnType("decimal(18,2)");
+            e.Property(x => x.Haber).HasColumnType("decimal(18,2)");
+            e.Property(x => x.SaldoAcumulado).HasColumnType("decimal(18,2)");
+            e.HasOne(x => x.Proveedor).WithMany().HasForeignKey(x => x.IdProveedor).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.IdProveedor, x.Fecha });
+        });
+
+        m.Entity<AuditLog>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.NombreUsuario).HasMaxLength(80);
+            e.Property(x => x.Entidad).HasMaxLength(100);
+            e.Property(x => x.EntidadId).HasMaxLength(50);
+            e.Property(x => x.Descripcion).HasMaxLength(1000);
+            e.HasIndex(x => new { x.Entidad, x.EntidadId });
+            e.HasIndex(x => x.Fecha);
+            e.HasIndex(x => x.IdUsuario);
         });
 
         m.Entity<ConfiguracionEmpresa>(e =>

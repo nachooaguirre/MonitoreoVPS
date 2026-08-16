@@ -194,7 +194,7 @@ public class AfipService
             {
                 Exito               = true,
                 CAE                 = $"6{DateTime.Now:yyMMddHHmmss}9",
-                FechaVencimientoCAE = DateTime.Today.AddDays(10),
+                FechaVencimientoCAE = DateTime.UtcNow.Date.AddDays(10),
                 NroComprobante      = solicitud.NroComprobante,
                 Observaciones       = "MODO DEMO — sin conexión a AFIP"
             };
@@ -212,7 +212,29 @@ public class AfipService
 
         var resp = await _http.SendAsync(req);
         var xml  = await resp.Content.ReadAsStringAsync();
-        return ParsearRespuestaCAE(xml, solicitud.NroComprobante);
+        var resultado = ParsearRespuestaCAE(xml, solicitud.NroComprobante);
+        resultado.RequestXml  = soap;
+        resultado.ResponseXml = xml;
+
+        // Error 10016 = "el número de comprobante no es el siguiente al último autorizado": casi siempre
+        // significa que ESTE comprobante ya fue autorizado antes (ej. la venta se guardó pero la respuesta
+        // se perdió por timeout) y AFIP rechaza el reintento por no ser "el próximo". En vez de dejar la
+        // venta sin CAE, recuperamos el que ya existe en vez de fallar.
+        if (!resultado.Exito && resultado.CodigosError.Contains("10016"))
+        {
+            var recuperado = await ConsultarComprobanteAsync(solicitud.PuntoVenta, solicitud.TipoComprobante, solicitud.NroComprobante);
+            if (recuperado?.CAE is { Length: > 0 })
+            {
+                resultado.Exito               = true;
+                resultado.CAE                 = recuperado.CAE;
+                resultado.FechaVencimientoCAE = recuperado.FechaVencimiento ?? DateTime.UtcNow.Date.AddDays(10);
+                resultado.Recuperado          = true;
+                resultado.Observaciones       = $"CAE recuperado de AFIP tras error 10016 (reintento). {resultado.Error}";
+                resultado.Error               = null;
+            }
+        }
+
+        return resultado;
     }
 
     /// <summary>
@@ -461,18 +483,20 @@ public class AfipService
                 {
                     Exito               = true,
                     CAE                 = cae,
-                    FechaVencimientoCAE = DateTime.TryParseExact(vtoStr, "yyyyMMdd", null, DateTimeStyles.None, out var dt) ? dt : DateTime.Today.AddDays(10),
+                    FechaVencimientoCAE = DateTime.TryParseExact(vtoStr, "yyyyMMdd", null, DateTimeStyles.None, out var dt) ? dt : DateTime.UtcNow.Date.AddDays(10),
                     NroComprobante      = nroComprobante,
                     Observaciones       = obs.Count > 0 ? string.Join("; ", obs) : null
                 };
             }
 
             var errorMsg = errores.Count > 0 ? string.Join("; ", errores) : "Rechazado por AFIP sin detalle.";
+            var codigos  = doc.Descendants(ns + "Err").Select(e => e.Element(ns + "Code")?.Value ?? "").Where(c => c != "").ToList();
             return new SolicitudCAEResult
             {
                 Exito          = false,
                 Error          = errorMsg,
-                NroComprobante = nroComprobante
+                NroComprobante = nroComprobante,
+                CodigosError   = codigos
             };
         }
         catch (Exception ex)
@@ -514,10 +538,14 @@ public class AfipService
     // 5. Helpers de tipos de comprobante
     // ══════════════════════════════════════════════════════════════════
 
-    /// <summary>Convierte letra de comprobante (A/B/C) y tipo (Factura/NC/ND) al código AFIP.</summary>
-    public static int ObtenerTipoComprobanteAfip(char letra, TipoComprobanteAfip tipo)
+    /// <summary>
+    /// Convierte letra de comprobante (A/B/C) y tipo (Factura/NC/ND) al código AFIP.
+    /// Si <paramref name="comision"/> es mayor a 0 y es una Factura A/B, AFIP exige emitirla como
+    /// Factura de Crédito Electrónica MiPyME (60=FCE A, 61=FCE B) en vez del tipo estándar (1/6).
+    /// </summary>
+    public static int ObtenerTipoComprobanteAfip(char letra, TipoComprobanteAfip tipo, decimal comision = 0)
     {
-        return (tipo, letra) switch
+        var codigo = (tipo, letra) switch
         {
             (TipoComprobanteAfip.Factura,      'A') => 1,
             (TipoComprobanteAfip.Factura,      'B') => 6,
@@ -530,7 +558,20 @@ public class AfipService
             (TipoComprobanteAfip.NotaCredito,  'C') => 13,
             _ => 6
         };
+        return AplicarFceSiCorresponde(codigo, comision);
     }
+
+    /// <summary>
+    /// Si hay comisión y el código es Factura A/B estándar (1/6), lo convierte a Factura de Crédito
+    /// Electrónica MiPyME (60/61) — requerido por AFIP en ese caso. Cualquier otro código (Factura C,
+    /// Notas de Débito/Crédito) queda sin cambios.
+    /// </summary>
+    public static int AplicarFceSiCorresponde(int codigoAfip, decimal comision) => (comision > 0, codigoAfip) switch
+    {
+        (true, 1) => 60,
+        (true, 6) => 61,
+        _ => codigoAfip
+    };
 
     /// <summary>Obtiene el Id de alícuota IVA según el porcentaje.</summary>
     public static int ObtenerIdAlicuotaIva(decimal porcentaje) => (int)porcentaje switch
@@ -573,7 +614,7 @@ public class SolicitudCAE
     public int     PuntoVenta       { get; set; }
     public int     TipoComprobante  { get; set; }   // 1=FA,6=FB,11=FC,2=NDA,7=NDB,12=NDC,3=NCA,8=NCB,13=NCC
     public long    NroComprobante   { get; set; }
-    public DateTime Fecha           { get; set; } = DateTime.Today;
+    public DateTime Fecha           { get; set; } = DateTime.UtcNow.Date;
     /// <summary>Concepto: 1=Productos, 2=Servicios, 3=Productos y Servicios</summary>
     public int     Concepto         { get; set; } = 1;
     /// <summary>Tipo de documento del receptor: 80=CUIT, 96=DNI, 99=Consumidor Final</summary>
@@ -607,6 +648,12 @@ public class SolicitudCAEResult
     public long      NroComprobante      { get; set; }
     public string?   Error               { get; set; }
     public string?   Observaciones       { get; set; }
+    /// <summary>Códigos de error de AFIP (ej. "10016"), vacío si Exito=true.</summary>
+    public List<string> CodigosError     { get; set; } = [];
+    /// <summary>true si el CAE no vino de esta solicitud sino que se recuperó tras un error 10016.</summary>
+    public bool      Recuperado          { get; set; }
+    public string?   RequestXml          { get; set; }
+    public string?   ResponseXml         { get; set; }
 
     /// <summary>
     /// Genera la URL del QR AFIP según especificación oficial (base64url, JSON interno).

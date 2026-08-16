@@ -4,6 +4,7 @@ using System.Data;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Mail;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
@@ -70,6 +71,7 @@ public class AlertasBackgroundService : BackgroundService
 
                 _logger.LogInformation("Ejecutando alertas programadas periódicamente...");
                 await RunAlertsAsync(-1, stoppingToken);
+                await EnviarMailingsPendientesAsync(stoppingToken);
             }
             catch (TaskCanceledException)
             {
@@ -83,6 +85,47 @@ public class AlertasBackgroundService : BackgroundService
 
         _logger.LogInformation("Deteniendo servicio de Alertas...");
         _tcpListener?.Stop();
+    }
+
+    /// <summary>Envía por SMTP los mailings encolados con Estado='P' (generados por RunAlertsAsync).</summary>
+    private async Task EnviarMailingsPendientesAsync(CancellationToken stoppingToken)
+    {
+        var host = _configuration["Smtp:Host"];
+        if (string.IsNullOrWhiteSpace(host))
+            return; // SMTP no configurado: los mailings quedan pendientes hasta que se configure
+
+        using var scope = _serviceProvider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SuperPOSDbContext>();
+
+        var pendientes = await db.Mailings.Where(m => m.Estado == 'P').ToListAsync(stoppingToken);
+        if (pendientes.Count == 0) return;
+
+        var port = _configuration.GetValue<int>("Smtp:Port", 587);
+        var user = _configuration["Smtp:User"];
+        var password = _configuration["Smtp:Password"];
+        var enableSsl = _configuration.GetValue<bool>("Smtp:EnableSsl", true);
+        var from = _configuration["Smtp:From"] ?? user ?? "no-reply@superpos.local";
+
+        using var client = new SmtpClient(host, port) { EnableSsl = enableSsl };
+        if (!string.IsNullOrWhiteSpace(user))
+            client.Credentials = new NetworkCredential(user, password);
+
+        foreach (var mail in pendientes)
+        {
+            try
+            {
+                using var msg = new MailMessage(from, mail.Destino, mail.Asunto, mail.Cuerpo);
+                await client.SendMailAsync(msg, stoppingToken);
+                mail.Estado = 'E';
+            }
+            catch (Exception ex)
+            {
+                mail.Estado = 'F';
+                _logger.LogError(ex, "Error al enviar mailing {Id} a {Destino}", mail.Id, mail.Destino);
+            }
+        }
+
+        await db.SaveChangesAsync(stoppingToken);
     }
 
     private async Task EscucharClientesTcpAsync(CancellationToken stoppingToken)

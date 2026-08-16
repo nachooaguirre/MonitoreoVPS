@@ -1,6 +1,11 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using SuperPOS.AFIP;
 using SuperPOS.API.Data;
+using SuperPOS.API.Helpers;
 using SuperPOS.API.Hubs;
 using SuperPOS.API.Services;
 
@@ -10,7 +15,15 @@ AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", false);
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers()
+// Permite instalar la API como Windows Service (sc create) para que sobreviva a reinicios/logout
+// en la PC del cliente. No-op cuando se corre normal (dotnet run, consola, IIS, etc.).
+builder.Host.UseWindowsService(o => o.ServiceName = "SuperPOS API");
+
+builder.Services.AddControllers(o =>
+    {
+        // Requiere JWT en todos los endpoints por defecto; usar [AllowAnonymous] para excepciones (ej. login).
+        o.Filters.Add(new AuthorizeFilter());
+    })
     .AddJsonOptions(o =>
     {
         o.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
@@ -18,6 +31,28 @@ builder.Services.AddControllers()
     });
 builder.Services.AddOpenApi();
 builder.Services.AddSignalR();
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidAudience = builder.Configuration["Jwt:Audience"],
+            IssuerSigningKey = JwtHelper.GetSigningKey(builder.Configuration)
+        };
+    });
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminOnly", policy =>
+        policy.RequireClaim("esAdministrador", "True"));
+});
+builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddDbContext<SuperPOSDbContext>(options =>
     options
@@ -48,6 +83,9 @@ builder.Services.AddScoped<IAiService, DeepSeekAiService>();
 
 // Servicio de importación de base de datos legacy MDB
 builder.Services.AddScoped<ImportadorLegacyService>();
+
+// Servicio de reportes contables AFIP
+builder.Services.AddScoped<IContabilidadService, ContabilidadService>();
 
 builder.Services.AddCors(options =>
 {
@@ -82,6 +120,7 @@ else
 
 app.UseStaticFiles();
 app.UseCors();
+app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<PosHub>("/hubs/pos");

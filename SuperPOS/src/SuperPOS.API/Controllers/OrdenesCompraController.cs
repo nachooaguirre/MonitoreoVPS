@@ -46,6 +46,15 @@ public class OrdenesCompraController(SuperPOSDbContext db) : ControllerBase
             .FirstOrDefaultAsync(o => o.Id == id);
         if (oc is null) return NotFound();
 
+        int? nroOriginal = null;
+        if (oc.IdOrdenCompraOriginal.HasValue)
+        {
+            nroOriginal = await db.OrdenesCompra
+                .Where(o => o.Id == oc.IdOrdenCompraOriginal.Value)
+                .Select(o => (int?)o.NroOrden)
+                .FirstOrDefaultAsync();
+        }
+
         return Ok(new
         {
             oc.Id,
@@ -59,6 +68,9 @@ public class OrdenesCompraController(SuperPOSDbContext db) : ControllerBase
             oc.TotalIva,
             oc.Observaciones,
             oc.FechaRecepcion,
+            oc.IdOrdenCompraOriginal,
+            oc.MotivoDiferencia,
+            NroOrdenOriginal = nroOriginal,
             ProveedorNombre = oc.Proveedor?.RazonSocial,
             ProveedorEmail = oc.Proveedor?.Email,
             Detalles = oc.Detalles.Select(d => new
@@ -71,6 +83,7 @@ public class OrdenesCompraController(SuperPOSDbContext db) : ControllerBase
                 d.PrecioCosto,
                 d.AlicuotaIva,
                 d.Subtotal,
+                d.ObservacionDiferencia,
                 Articulo = d.Articulo == null ? null : new
                 {
                     d.Articulo.Id,
@@ -109,6 +122,9 @@ public class OrdenesCompraController(SuperPOSDbContext db) : ControllerBase
         oc.TotalSinIva = ocActualizada.Detalles.Sum(d => d.Subtotal / (1 + d.AlicuotaIva / 100));
         oc.TotalIva = ocActualizada.Detalles.Sum(d => d.Subtotal - d.Subtotal / (1 + d.AlicuotaIva / 100));
         oc.Total = ocActualizada.Detalles.Sum(d => d.Subtotal);
+        oc.Observaciones = ocActualizada.Observaciones;
+        oc.MotivoDiferencia = ocActualizada.MotivoDiferencia;
+        oc.IdOrdenCompraOriginal = ocActualizada.IdOrdenCompraOriginal;
 
         // Eliminar detalles que ya no están
         var idsNuevos = ocActualizada.Detalles.Select(d => d.IdArticulo).ToList();
@@ -160,29 +176,35 @@ public class OrdenesCompraController(SuperPOSDbContext db) : ControllerBase
         var oc = await db.OrdenesCompra.Include(o => o.Detalles).FirstOrDefaultAsync(o => o.Id == id);
         if (oc is null) return NotFound();
 
-        var idDestino = req.IdSucursalDestino
-            ?? await StockSucursalHelper.ObtenerIdSucursalCentralAsync(db)
-            ?? 1;
-
         foreach (var item in req.Items)
         {
             var det = oc.Detalles.FirstOrDefault(d => d.IdArticulo == item.IdArticulo);
-            if (det is null) continue;
-            det.CantidadRecibida = item.CantidadRecibida;
-
-            if (item.CantidadRecibida != 0)
-                await StockSucursalHelper.AplicarMovimientoAsync(db, item.IdArticulo, idDestino, item.CantidadRecibida);
-
-            var art = await db.Articulos.FindAsync(item.IdArticulo);
-            if (art != null && item.PrecioCosto > 0)
+            if (det != null)
             {
-                art.PrecioCosto = item.PrecioCosto;
-                art.FechaModificacion = DateTime.UtcNow;
+                det.CantidadRecibida = item.CantidadRecibida;
+                det.ObservacionDiferencia = item.ObservacionDiferencia;
+            }
+            else
+            {
+                // Articulo excedente: agregarlo con cantidad pedida = 0
+                var art = await db.Articulos.FindAsync(item.IdArticulo);
+                if (art != null)
+                {
+                    oc.Detalles.Add(new OrdenCompraDetalle
+                    {
+                        IdArticulo = item.IdArticulo,
+                        CantidadPedida = 0,
+                        CantidadRecibida = item.CantidadRecibida,
+                        PrecioCosto = item.PrecioCosto > 0 ? item.PrecioCosto : (decimal)art.PrecioCosto,
+                        AlicuotaIva = (decimal)art.AlicuotaIva,
+                        Subtotal = 0,
+                        ObservacionDiferencia = item.ObservacionDiferencia
+                    });
+                }
             }
         }
 
-        bool todosRecibidos = oc.Detalles.All(d => d.CantidadRecibida >= d.CantidadPedida);
-        oc.Estado = todosRecibidos ? EstadoOrdenCompra.Recibida : EstadoOrdenCompra.RecepcionParcial;
+        oc.Estado = EstadoOrdenCompra.RecepcionParcial;
         oc.FechaRecepcion = DateTime.UtcNow;
         oc.IdUsuarioRecepcion = req.IdUsuario;
 
@@ -197,6 +219,17 @@ public class OrdenesCompraController(SuperPOSDbContext db) : ControllerBase
         if (oc is null) return NotFound();
         if (oc.Estado == EstadoOrdenCompra.Recibida) return BadRequest("No se puede anular una OC ya recibida.");
         oc.Estado = EstadoOrdenCompra.Anulada;
+        await db.SaveChangesAsync();
+        return Ok(oc);
+    }
+
+    [HttpPut("{id}/devolver")]
+    public async Task<IActionResult> Devolver(int id)
+    {
+        var oc = await db.OrdenesCompra.FindAsync(id);
+        if (oc is null) return NotFound();
+        if (oc.Estado == EstadoOrdenCompra.Recibida) return BadRequest("No se puede devolver una OC ya recibida.");
+        oc.Estado = EstadoOrdenCompra.Devolvida;
         await db.SaveChangesAsync();
         return Ok(oc);
     }
@@ -265,4 +298,5 @@ public class ItemRecepcion
     public int IdArticulo { get; set; }
     public decimal CantidadRecibida { get; set; }
     public decimal PrecioCosto { get; set; }
+    public string? ObservacionDiferencia { get; set; }
 }

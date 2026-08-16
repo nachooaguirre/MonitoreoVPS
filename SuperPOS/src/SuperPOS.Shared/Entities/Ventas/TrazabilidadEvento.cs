@@ -43,6 +43,8 @@ public enum TipoTrazabilidadEvento
     AjusteInventario = 5,
     CompraRecepcion = 6,
     Merma = 7,
-    Transferencia = 8
+    Transferencia = 8,
+    SalidaRemito = 9,
+    MovimientoInterno = 10
 }
 

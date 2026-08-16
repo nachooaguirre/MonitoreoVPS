@@ -1,6 +1,8 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SuperPOS.API.Data;
+using SuperPOS.API.Helpers;
 using SuperPOS.Shared.Entities.Ventas;
 using System.Security.Cryptography;
 using System.Text;
@@ -9,7 +11,7 @@ namespace SuperPOS.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class UsuariosController(SuperPOSDbContext db) : ControllerBase
+public class UsuariosController(SuperPOSDbContext db, IConfiguration config) : ControllerBase
 {
     private static string HashSha256(string texto)
     {
@@ -18,8 +20,9 @@ public class UsuariosController(SuperPOSDbContext db) : ControllerBase
     }
 
     // POST /api/usuarios/login
+    [AllowAnonymous]
     [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] LoginRequest req)
+    public async Task<IActionResult> Login([FromBody] LoginRequest req, [FromQuery] bool esZebra = false)
     {
         var hash = HashSha256(req.Password);
         var user = await db.Usuarios
@@ -29,9 +32,14 @@ public class UsuariosController(SuperPOSDbContext db) : ControllerBase
         if (user is null)
             return Unauthorized(new { error = "Usuario o contraseña incorrectos" });
 
+        if (esZebra && !user.AccesoZebra)
+            return Unauthorized(new { error = "Usuario no autorizado para terminales Zebra" });
+
         user.UltimoAcceso = DateTime.UtcNow;
         await db.SaveChangesAsync();
-        return Ok(user);
+
+        var token = JwtHelper.GenerarToken(config, user);
+        return Ok(new { usuario = user, token });
     }
 
     [HttpGet]
@@ -64,7 +72,8 @@ public class UsuariosController(SuperPOSDbContext db) : ControllerBase
             Email = req.Email,
             Telefono = req.Telefono,
             Activo = true,
-            FechaAlta = DateTime.UtcNow
+            FechaAlta = DateTime.UtcNow,
+            AccesoZebra = req.AccesoZebra
         };
         db.Usuarios.Add(user);
         await db.SaveChangesAsync();
@@ -82,6 +91,7 @@ public class UsuariosController(SuperPOSDbContext db) : ControllerBase
         user.Email = req.Email;
         user.Telefono = req.Telefono;
         user.Activo = req.Activo;
+        user.AccesoZebra = req.AccesoZebra;
 
         if (!string.IsNullOrWhiteSpace(req.NuevaPassword))
             user.PasswordHash = HashSha256(req.NuevaPassword);
@@ -96,8 +106,19 @@ public class UsuariosController(SuperPOSDbContext db) : ControllerBase
         if (id == 1) return BadRequest(new { error = "No se puede eliminar el administrador principal" });
         var u = await db.Usuarios.FindAsync(id);
         if (u is null) return NotFound();
-        u.Activo = false;
-        await db.SaveChangesAsync();
+
+        try
+        {
+            db.Usuarios.Remove(u);
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            db.Entry(u).State = EntityState.Unchanged;
+            u.Activo = false;
+            await db.SaveChangesAsync();
+        }
+
         return NoContent();
     }
 
@@ -132,5 +153,5 @@ public class UsuariosController(SuperPOSDbContext db) : ControllerBase
 }
 
 public record LoginRequest(string NombreUsuario, string Password);
-public record CreateUsuarioRequest(string NombreUsuario, string NombreCompleto, string Password, int IdPerfil, string? Email, string? Telefono);
-public record UpdateUsuarioRequest(string NombreCompleto, int IdPerfil, bool Activo, string? NuevaPassword, string? Email, string? Telefono);
+public record CreateUsuarioRequest(string NombreUsuario, string NombreCompleto, string Password, int IdPerfil, string? Email, string? Telefono, bool AccesoZebra);
+public record UpdateUsuarioRequest(string NombreCompleto, int IdPerfil, bool Activo, string? NuevaPassword, string? Email, string? Telefono, bool AccesoZebra);

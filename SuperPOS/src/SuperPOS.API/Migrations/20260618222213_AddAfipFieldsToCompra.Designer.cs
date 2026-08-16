@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SuperPOS.API.Data;
@@ -11,9 +12,11 @@ using SuperPOS.API.Data;
 namespace SuperPOS.API.Migrations
 {
     [DbContext(typeof(SuperPOSDbContext))]
-    partial class SuperPOSDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260618222213_AddAfipFieldsToCompra")]
+    partial class AddAfipFieldsToCompra
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -179,18 +182,6 @@ namespace SuperPOS.API.Migrations
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
-
-                    b.Property<string>("ContenidoUnidad")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)")
-                        .HasDefaultValue("UN");
-
-                    b.Property<decimal>("ContenidoValor")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("decimal(18,4)")
-                        .HasDefaultValue(1m);
 
                     b.Property<string>("Descripcion")
                         .IsRequired()
@@ -414,55 +405,6 @@ namespace SuperPOS.API.Migrations
                         .IsUnique();
 
                     b.ToTable("ArticulosStockPorSucursal");
-                });
-
-            modelBuilder.Entity("SuperPOS.Shared.Entities.Ventas.AuditLog", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<int>("Accion")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("CambiosJson")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Descripcion")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<string>("Entidad")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("EntidadId")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<DateTime>("Fecha")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("IdUsuario")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("NombreUsuario")
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Fecha");
-
-                    b.HasIndex("IdUsuario");
-
-                    b.HasIndex("Entidad", "EntidadId");
-
-                    b.ToTable("AuditLogs");
                 });
 
             modelBuilder.Entity("SuperPOS.Shared.Entities.Ventas.Banco", b =>
@@ -1053,9 +995,6 @@ namespace SuperPOS.API.Migrations
                     b.Property<DateTime?>("CAEVencimiento")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<decimal>("Comision")
-                        .HasColumnType("decimal(18,2)");
-
                     b.Property<bool>("EsFacturaElectronica")
                         .HasColumnType("boolean");
 
@@ -1071,10 +1010,7 @@ namespace SuperPOS.API.Migrations
                     b.Property<int>("IdCaja")
                         .HasColumnType("integer");
 
-                    b.Property<int?>("IdCliente")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("IdProveedor")
+                    b.Property<int>("IdCliente")
                         .HasColumnType("integer");
 
                     b.Property<int>("IdSucursal")
@@ -1128,48 +1064,12 @@ namespace SuperPOS.API.Migrations
 
                     b.HasIndex("IdCliente");
 
-                    b.HasIndex("IdProveedor");
-
                     b.HasIndex("IdTipoComprobante");
 
-                    b.HasIndex("IdSucursal", "PuntoVenta", "IdTipoComprobante", "Numero", "Letra")
+                    b.HasIndex("IdSucursal", "PuntoVenta", "Numero", "Letra")
                         .IsUnique();
 
                     b.ToTable("Comprobantes");
-                });
-
-            modelBuilder.Entity("SuperPOS.Shared.Entities.Ventas.ComprobanteAfipLog", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("Detalle")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<DateTime>("Fecha")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long>("IdComprobante")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("RequestXml")
-                        .HasColumnType("text");
-
-                    b.Property<string>("ResponseXml")
-                        .HasColumnType("text");
-
-                    b.Property<char>("Resultado")
-                        .HasColumnType("character(1)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("IdComprobante");
-
-                    b.ToTable("ComprobantesAfipLog");
                 });
 
             modelBuilder.Entity("SuperPOS.Shared.Entities.Ventas.ComprobanteDetalle", b =>
@@ -3143,50 +3043,6 @@ namespace SuperPOS.API.Migrations
                     b.ToTable("MovimientosCtaCte");
                 });
 
-            modelBuilder.Entity("SuperPOS.Shared.Entities.Ventas.MovimientoCtaCteProveedor", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("Concepto")
-                        .IsRequired()
-                        .HasMaxLength(250)
-                        .HasColumnType("character varying(250)");
-
-                    b.Property<decimal>("Debe")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<DateTime>("Fecha")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal>("Haber")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<long?>("IdCompra")
-                        .HasColumnType("bigint");
-
-                    b.Property<int>("IdProveedor")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("IdUsuario")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("SaldoAcumulado")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<int>("Tipo")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("IdProveedor", "Fecha");
-
-                    b.ToTable("MovimientosCtaCteProveedor");
-                });
-
             modelBuilder.Entity("SuperPOS.Shared.Entities.Ventas.MovimientoTesoreria", b =>
                 {
                     b.Property<int>("Id")
@@ -4815,12 +4671,8 @@ namespace SuperPOS.API.Migrations
                     b.HasOne("SuperPOS.Shared.Entities.Ventas.Cliente", "Cliente")
                         .WithMany()
                         .HasForeignKey("IdCliente")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("SuperPOS.Shared.Entities.Ventas.Proveedor", "Proveedor")
-                        .WithMany()
-                        .HasForeignKey("IdProveedor")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.HasOne("SuperPOS.Shared.Entities.Ventas.TipoComprobante", "TipoComprobante")
                         .WithMany()
@@ -4830,20 +4682,7 @@ namespace SuperPOS.API.Migrations
 
                     b.Navigation("Cliente");
 
-                    b.Navigation("Proveedor");
-
                     b.Navigation("TipoComprobante");
-                });
-
-            modelBuilder.Entity("SuperPOS.Shared.Entities.Ventas.ComprobanteAfipLog", b =>
-                {
-                    b.HasOne("SuperPOS.Shared.Entities.Ventas.Comprobante", "Comprobante")
-                        .WithMany()
-                        .HasForeignKey("IdComprobante")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Comprobante");
                 });
 
             modelBuilder.Entity("SuperPOS.Shared.Entities.Ventas.ComprobanteDetalle", b =>
@@ -5040,17 +4879,6 @@ namespace SuperPOS.API.Migrations
                         .IsRequired();
 
                     b.Navigation("Cliente");
-                });
-
-            modelBuilder.Entity("SuperPOS.Shared.Entities.Ventas.MovimientoCtaCteProveedor", b =>
-                {
-                    b.HasOne("SuperPOS.Shared.Entities.Ventas.Proveedor", "Proveedor")
-                        .WithMany()
-                        .HasForeignKey("IdProveedor")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Proveedor");
                 });
 
             modelBuilder.Entity("SuperPOS.Shared.Entities.Ventas.MovimientoTesoreria", b =>

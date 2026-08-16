@@ -12,6 +12,7 @@ public class Usuario
     public DateTime? UltimoAcceso { get; set; }
     public string? Email { get; set; }
     public string? Telefono { get; set; }
+    public bool AccesoZebra { get; set; } = false;
     public Perfil? Perfil { get; set; }
 }
 

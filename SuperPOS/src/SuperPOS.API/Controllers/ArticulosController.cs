@@ -20,7 +20,8 @@ public class ArticulosController(SuperPOSDbContext db) : ControllerBase
         [FromQuery] bool? soloConStock,
         [FromQuery] bool incluirInactivos = false,
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 100)
+        [FromQuery] int pageSize = 100,
+        [FromQuery] bool aplicarOfertas = false)
     {
         var q = db.Articulos
             .Include(a => a.Departamento)
@@ -48,6 +49,25 @@ public class ArticulosController(SuperPOSDbContext db) : ControllerBase
 
         var total = await q.CountAsync();
         var items = await q.OrderBy(a => a.Descripcion).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+
+        if (aplicarOfertas)
+        {
+            var now = DateTime.UtcNow;
+            var artIds = items.Select(a => a.Id).ToList();
+            var ofertas = await db.Ofertas
+                .Where(o => artIds.Contains(o.IdArticulo) && o.Activa && o.FechaDesde <= now && o.FechaHasta >= now)
+                .ToListAsync();
+
+            foreach (var art in items)
+            {
+                var oferta = ofertas.FirstOrDefault(o => o.IdArticulo == art.Id);
+                if (oferta != null && (oferta.LimiteStock == null || oferta.CantidadVendida < oferta.LimiteStock))
+                {
+                    art.PrecioVenta = oferta.PrecioOferta;
+                }
+            }
+        }
+
         return Ok(new { total, page, pageSize, items });
     }
 
@@ -65,6 +85,20 @@ public class ArticulosController(SuperPOSDbContext db) : ControllerBase
                 .Include(a => a.CodigosBarras)
                 .FirstOrDefaultAsync(a => a.Activo && a.CodigosBarras.Any(cb => cb.CodigoBarras == codigo));
         }
+
+        if (art is not null)
+        {
+            var now = DateTime.UtcNow;
+            var oferta = await db.Ofertas
+                .Where(o => o.IdArticulo == art.Id && o.Activa && o.FechaDesde <= now && o.FechaHasta >= now)
+                .FirstOrDefaultAsync();
+
+            if (oferta != null && (oferta.LimiteStock == null || oferta.CantidadVendida < oferta.LimiteStock))
+            {
+                art.PrecioVenta = oferta.PrecioOferta;
+            }
+        }
+
         return art is null ? NotFound() : Ok(art);
     }
 
@@ -401,18 +435,41 @@ public class ArticulosController(SuperPOSDbContext db) : ControllerBase
     }
 
     [HttpPut("{id}/ajustar-stock")]
-    public async Task<IActionResult> AjustarStock(int id, [FromQuery] decimal delta, [FromQuery] int? idSucursal = null)
+    public async Task<IActionResult> AjustarStock(int id, [FromQuery] decimal delta, [FromQuery] int? idSucursal = null,
+        [FromQuery] string? motivo = null, [FromQuery] int? idUsuario = null)
     {
         var art = await db.Articulos.FindAsync(id);
         if (art is null) return NotFound();
 
         var idSuc = idSucursal ?? await StockSucursalHelper.ObtenerIdSucursalCentralAsync(db) ?? 1;
-        
-        await StockSucursalHelper.AplicarMovimientoAsync(db, id, idSuc, delta);
-        
-        // Sincronizar el StockActual en el modelo Articulo para que coincida en la base general
-        art.StockActual = await StockSucursalHelper.ObtenerCantidadAsync(db, id, idSuc);
+
+        try
+        {
+            // AplicarMovimientoAsync ya recalcula y fija Articulo.StockActual/StockDeposito (total real
+            // entre todas las sucursales) vía SincronizarCamposArticuloAsync — no reasignar acá con una
+            // lectura no trackeada de una sola sucursal, que pisaba ese valor correcto con uno obsoleto.
+            await StockSucursalHelper.AplicarMovimientoAsync(db, id, idSuc, delta);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
         art.FechaModificacion = DateTime.UtcNow;
+
+        if (delta != 0)
+        {
+            var sucNombre = await db.Sucursales.Where(s => s.Id == idSuc).Select(s => s.Nombre).FirstOrDefaultAsync();
+            db.TrazabilidadEventos.Add(new TrazabilidadEvento
+            {
+                Fecha = DateTime.UtcNow,
+                IdArticulo = id,
+                Cantidad = delta,
+                Tipo = string.IsNullOrWhiteSpace(motivo) ? TipoTrazabilidadEvento.AjusteInventario : TipoTrazabilidadEvento.MovimientoInterno,
+                Ubicacion = motivo ?? sucNombre ?? $"Sucursal {idSuc}",
+                IdUsuario = idUsuario is > 0 ? idUsuario : null
+            });
+        }
+
         await db.SaveChangesAsync();
 
         return Ok(new { id = art.Id, stockActual = art.StockActual });

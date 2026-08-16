@@ -433,24 +433,82 @@ public class ImportadorLegacyService
                 _logger.LogWarning(ex, "Error al importar Auditoria.");
             }
 
-            // 9. CajerosLegacy
+            // 9. CajerosLegacy y mapeo a Usuarios
             try
             {
                 _logger.LogInformation("Importando CajerosLegacy...");
                 await _db.Database.ExecuteSqlRawAsync("TRUNCATE TABLE \"CajerosLegacy\" CASCADE;");
+                
+                var cajerosImportados = new System.Collections.Generic.List<CajeroLegacy>();
                 using (var cmd = new OdbcCommand("SELECT Codigo, Nombre, Clave, Nivel FROM Cajeros", conn))
                 using (var reader = cmd.ExecuteReader())
                 {
                     while (reader.Read())
                     {
-                        _db.CajerosLegacy.Add(new CajeroLegacy
+                        var cajero = new CajeroLegacy
                         {
                             Codigo = Convert.ToInt32(reader["Codigo"]),
                             Nombre = GetStr(reader["Nombre"]),
                             Clave = GetStr(reader["Clave"]),
                             Nivel = GetInt(reader["Nivel"])
-                        });
+                        };
+                        _db.CajerosLegacy.Add(cajero);
+                        cajerosImportados.Add(cajero);
                         result.CajerosCreados++;
+                    }
+                }
+                await _db.SaveChangesAsync();
+
+                // Mapear a la tabla Usuarios para permitir inicio de sesión directo a la App y Zebra
+                _logger.LogInformation("Mapeando Cajeros a Usuarios para acceso a App y Zebra...");
+                foreach (var cajero in cajerosImportados)
+                {
+                    if (string.IsNullOrWhiteSpace(cajero.Nombre)) continue;
+
+                    string username = cajero.Nombre.Trim().ToLower()
+                        .Replace(" ", "")
+                        .Replace("á", "a").Replace("é", "e").Replace("í", "i").Replace("ó", "o").Replace("ú", "u");
+
+                    if (string.IsNullOrWhiteSpace(username))
+                        username = $"cajero{cajero.Codigo}";
+
+                    // Asegurar que sea único
+                    string baseUsername = username;
+                    int suffix = 1;
+                    while (await _db.Usuarios.AnyAsync(u => u.NombreUsuario == username))
+                    {
+                        username = $"{baseUsername}{suffix}";
+                        suffix++;
+                    }
+
+                    // Determinar perfil según Nivel
+                    int idPerfil = 2; // Cajero por defecto
+                    if (cajero.Nivel == 1) idPerfil = 1; // Administrador
+                    else if (cajero.Nivel == 4) idPerfil = 4; // Supervisor
+                    else if (cajero.Nivel == 3) idPerfil = 3; // Repositor
+
+                    string passwordClara = !string.IsNullOrWhiteSpace(cajero.Clave) ? cajero.Clave : username;
+                    string hash = HashSha256(passwordClara);
+
+                    var usuarioExistente = await _db.Usuarios.FirstOrDefaultAsync(u => u.NombreCompleto == cajero.Nombre);
+                    if (usuarioExistente == null)
+                    {
+                        _db.Usuarios.Add(new Usuario
+                        {
+                            NombreUsuario = username,
+                            NombreCompleto = cajero.Nombre,
+                            PasswordHash = hash,
+                            IdPerfil = idPerfil,
+                            Activo = true,
+                            FechaAlta = DateTime.UtcNow,
+                            AccesoZebra = true
+                        });
+                    }
+                    else
+                    {
+                        usuarioExistente.AccesoZebra = true;
+                        usuarioExistente.PasswordHash = hash;
+                        usuarioExistente.IdPerfil = idPerfil;
                     }
                 }
                 await _db.SaveChangesAsync();
@@ -1234,6 +1292,12 @@ public class ImportadorLegacyService
         }
 
         return result;
+    }
+
+    private static string HashSha256(string texto)
+    {
+        var bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(texto));
+        return Convert.ToHexString(bytes).ToLower();
     }
 
     private class PromocionConditionDto

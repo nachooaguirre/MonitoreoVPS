@@ -217,6 +217,26 @@ public class RemitosController(SuperPOSDbContext db) : ControllerBase
                     });
                 }
             }
+            else if (remito.Tipo == TipoRemito.Salida && item.CantidadRecibida != 0)
+            {
+                await StockSucursalHelper.AplicarMovimientoAsync(db, item.IdArticulo, idDestino, -item.CantidadRecibida);
+
+                var sucNombre = await db.Sucursales.Where(s => s.Id == idDestino).Select(s => s.Nombre).FirstOrDefaultAsync();
+                eventos.Add(new TrazabilidadEvento
+                {
+                    Fecha = DateTime.UtcNow,
+                    IdArticulo = item.IdArticulo,
+                    Cantidad = -item.CantidadRecibida,
+                    Tipo = TipoTrazabilidadEvento.SalidaRemito,
+                    Ubicacion = sucNombre ?? $"Sucursal {idDestino}",
+                    IdUsuario = req.IdUsuario > 0 ? req.IdUsuario : null,
+                    IdRemito = remito.Id,
+                    IdRemitoDetalle = det.Id,
+                    LoteNro = det.LoteNro,
+                    NroSerie = det.NroSerie,
+                    FechaVencimiento = det.FechaVencimiento
+                });
+            }
         }
 
         remito.Estado = EstadoRemito.Confirmado;
@@ -230,7 +250,7 @@ public class RemitosController(SuperPOSDbContext db) : ControllerBase
                 foreach (var det in remito.Detalles)
                 {
                     var ocDet = oc.Detalles.FirstOrDefault(d => d.IdArticulo == det.IdArticulo);
-                    if (ocDet != null) ocDet.CantidadRecibida += det.CantidadRecibida;
+                    if (ocDet != null) ocDet.CantidadRecibida = det.CantidadRecibida;
                 }
                 oc.Estado = oc.Detalles.All(d => d.CantidadRecibida >= d.CantidadPedida)
                     ? EstadoOrdenCompra.Recibida : EstadoOrdenCompra.RecepcionParcial;
@@ -266,7 +286,7 @@ public class CrearRemitoRequest
 public class ConfirmarRemitoRequest
 {
     public int IdUsuario { get; set; }
-    /// <summary>Sucursal donde ingresa la mercadería. Si no se envía, se usa la marcada como central (EsCentral).</summary>
+    /// <summary>Sucursal donde ingresa (Entrada) o de donde sale (Salida) la mercadería. Si no se envía, se usa la marcada como central (EsCentral).</summary>
     public int? IdSucursalDestino { get; set; }
     public List<ItemRecepcionRemito> Items { get; set; } = [];
 }

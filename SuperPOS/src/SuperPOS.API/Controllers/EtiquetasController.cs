@@ -29,7 +29,11 @@ public class EtiquetasController(SuperPOSDbContext db) : ControllerBase
                     e.Articulo.Descripcion,
                     e.Articulo.PrecioVenta,
                     e.Articulo.PrecioCosto,
-                    e.Articulo.StockActual
+                    e.Articulo.StockActual,
+                    e.Articulo.AlicuotaIva,
+                    e.Articulo.AplicaIva,
+                    e.Articulo.ContenidoValor,
+                    e.Articulo.ContenidoUnidad
                 } : null
             })
             .ToListAsync();

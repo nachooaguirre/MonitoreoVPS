@@ -18,6 +18,8 @@ public class OrdenCompra
     public string? Observaciones { get; set; }
     public DateTime? FechaRecepcion { get; set; }
     public int? IdUsuarioRecepcion { get; set; }
+    public int? IdOrdenCompraOriginal { get; set; }
+    public string? MotivoDiferencia { get; set; }
 
     public Proveedor? Proveedor { get; set; }
     public ICollection<OrdenCompraDetalle> Detalles { get; set; } = [];
@@ -33,6 +35,7 @@ public class OrdenCompraDetalle
     public decimal PrecioCosto { get; set; }
     public decimal AlicuotaIva { get; set; }
     public decimal Subtotal { get; set; }
+    public string? ObservacionDiferencia { get; set; }
 
     public Articulo? Articulo { get; set; }
     public OrdenCompra? OrdenCompra { get; set; }
@@ -46,5 +49,6 @@ public enum EstadoOrdenCompra
     Recibida = 3,
     Anulada = 4,
     /// <summary>OC creada desde el asistente IA; aún no confirmada como pedido “pendiente” normal.</summary>
-    Borrador = 5
+    Borrador = 5,
+    Devolvida = 6
 }

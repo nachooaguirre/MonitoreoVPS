@@ -37,6 +37,8 @@ public class Articulo
     public decimal CajasPorBulto { get; set; } = 1;
     public bool EsPesable { get; set; }
     public int BanderaEAN { get; set; }   // 0=normal, 20=peso, 21=precio
+    public decimal ContenidoValor { get; set; } = 1m;
+    public string ContenidoUnidad { get; set; } = "UN";
 
     // Stock
     public decimal StockActual { get; set; }
@@ -55,6 +57,10 @@ public class Articulo
     public DateTime? FechaModificacion { get; set; }
     public DateTime? UltimaVenta { get; set; }
     public decimal CantidadVendida { get; set; }
+
+    public int? IdArticuloPadre { get; set; }
+    public decimal MultiplicadorStock { get; set; } = 1m;
+    public Articulo? ArticuloPadre { get; set; }
 
     public Departamento? Departamento { get; set; }
     public Familia? Familia { get; set; }

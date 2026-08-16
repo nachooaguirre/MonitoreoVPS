@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SuperPOS.API.Data;
@@ -11,9 +12,11 @@ using SuperPOS.API.Data;
 namespace SuperPOS.API.Migrations
 {
     [DbContext(typeof(SuperPOSDbContext))]
-    partial class SuperPOSDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260815190340_FixComprobanteNumeroIndexPorTipo")]
+    partial class FixComprobanteNumeroIndexPorTipo
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1071,7 +1074,7 @@ namespace SuperPOS.API.Migrations
                     b.Property<int>("IdCaja")
                         .HasColumnType("integer");
 
-                    b.Property<int?>("IdCliente")
+                    b.Property<int>("IdCliente")
                         .HasColumnType("integer");
 
                     b.Property<int?>("IdProveedor")
@@ -4815,7 +4818,8 @@ namespace SuperPOS.API.Migrations
                     b.HasOne("SuperPOS.Shared.Entities.Ventas.Cliente", "Cliente")
                         .WithMany()
                         .HasForeignKey("IdCliente")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.HasOne("SuperPOS.Shared.Entities.Ventas.Proveedor", "Proveedor")
                         .WithMany()

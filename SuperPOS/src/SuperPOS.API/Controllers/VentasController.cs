@@ -47,27 +47,52 @@ public class VentasController(SuperPOSDbContext db, IHubContext<PosHub> hub, Afi
         cbte.Fecha = DateTime.UtcNow;
         cbte.Estado = EstadoComprobante.Emitido;
 
-        // Calcular número correlativo
-        var ultimo = await db.Comprobantes
-            .Where(c => c.PuntoVenta == cbte.PuntoVenta && c.IdTipoComprobante == cbte.IdTipoComprobante && c.Letra == cbte.Letra)
-            .MaxAsync(c => (long?)c.Numero) ?? 0;
-        cbte.Numero = ultimo + 1;
-
         // Stock por sucursal (caja / local) + trazabilidad
         var eventos = new List<TrazabilidadEvento>();
-        foreach (var det in cbte.Detalles)
+        var now = DateTime.UtcNow;
+
+        // La numeración de comprobante (PuntoVenta+Tipo+Letra) debe ser estrictamente correlativa
+        // y sin huecos/duplicados ante AFIP. Con dos cajas vendiendo al mismo instante, un simple
+        // "MAX+1" puede calcular el mismo número dos veces. pg_advisory_xact_lock serializa —solo—
+        // las ventas que comparten esa misma clave (otra caja/letra sigue vendiendo en paralelo sin
+        // esperar), y el lock se libera solo al terminar esta transacción (no bloquea la llamada a AFIP,
+        // que ocurre después, fuera de esta transacción).
+        var lockKey = $"cbte:{cbte.IdSucursal}:{cbte.PuntoVenta}:{cbte.IdTipoComprobante}:{cbte.Letra}";
+        await using (var tx = await db.Database.BeginTransactionAsync())
         {
-            await StockSucursalHelper.AplicarMovimientoAsync(db, det.IdArticulo, cbte.IdSucursal, -det.Cantidad, permitirNegativo: true);
-            var art = await db.Articulos.FindAsync(det.IdArticulo);
-            if (art != null)
+            await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({lockKey}))");
+
+            var ultimo = await db.Comprobantes
+                .Where(c => c.PuntoVenta == cbte.PuntoVenta && c.IdTipoComprobante == cbte.IdTipoComprobante && c.Letra == cbte.Letra)
+                .MaxAsync(c => (long?)c.Numero) ?? 0;
+            cbte.Numero = ultimo + 1;
+
+            foreach (var det in cbte.Detalles)
             {
-                art.CantidadVendida += det.Cantidad;
-                art.UltimaVenta = DateTime.UtcNow;
+                await StockSucursalHelper.AplicarMovimientoAsync(db, det.IdArticulo, cbte.IdSucursal, -det.Cantidad, permitirNegativo: true);
+                var art = await db.Articulos.FindAsync(det.IdArticulo);
+                if (art != null)
+                {
+                    art.CantidadVendida += det.Cantidad;
+                    art.UltimaVenta = DateTime.UtcNow;
+                }
+
+                // Incrementar cantidad vendida en la oferta activa si existe
+                var oferta = await db.Ofertas
+                    .Where(o => o.IdArticulo == det.IdArticulo && o.Activa && o.FechaDesde <= now && o.FechaHasta >= now)
+                    .FirstOrDefaultAsync();
+                if (oferta != null && (oferta.LimiteStock == null || oferta.CantidadVendida < oferta.LimiteStock))
+                {
+                    oferta.CantidadVendida += det.Cantidad;
+                }
             }
+
+            db.Comprobantes.Add(cbte);
+            await db.SaveChangesAsync();
+            await tx.CommitAsync();
         }
 
-        db.Comprobantes.Add(cbte);
-        await db.SaveChangesAsync();
+        await AplicarPagoCtaCteAsync(cbte);
 
         // Trazabilidad de venta (ya con IDs asignados)
         foreach (var det in cbte.Detalles)
@@ -108,7 +133,7 @@ public class VentasController(SuperPOSDbContext db, IHubContext<PosHub> hub, Afi
                 var solicitud = new SolicitudCAE
                 {
                     PuntoVenta      = cbte.PuntoVenta,
-                    TipoComprobante = AfipService.ObtenerTipoComprobanteAfip(cbte.Letra, TipoComprobanteAfip.Factura),
+                    TipoComprobante = ObtenerCodigoAfip(tipoCbte, cbte.Letra, cbte.Comision),
                     NroComprobante  = cbte.Numero,
                     Fecha           = cbte.Fecha,
                     Concepto        = 1,    // Productos (supermercado siempre vende productos)
@@ -121,6 +146,7 @@ public class VentasController(SuperPOSDbContext db, IHubContext<PosHub> hub, Afi
                 };
 
                 var resultado = await afip.SolicitarCAEAsync(solicitud);
+                await RegistrarLogAfipAsync(cbte.Id, resultado);
                 if (resultado.Exito)
                 {
                     cbte.CAE            = long.TryParse(resultado.CAE, out var caeNum) ? caeNum : null;
@@ -139,6 +165,7 @@ public class VentasController(SuperPOSDbContext db, IHubContext<PosHub> hub, Afi
             catch (Exception ex)
             {
                 // No interrumpir la venta si AFIP falla — se puede reintentar después
+                await RegistrarLogAfipAsync(cbte.Id, null, ex.Message);
                 Console.WriteLine($"[AFIP] Error al solicitar CAE: {ex.Message}");
             }
         }
@@ -157,6 +184,72 @@ public class VentasController(SuperPOSDbContext db, IHubContext<PosHub> hub, Afi
             cbte.CAEVencimiento,
             cbte.QrAfip,
             cbte.Estado
+        });
+    }
+
+    /// <summary>Si la venta se pagó (total o parcialmente) con cuenta corriente, carga el saldo al cliente.</summary>
+    private async Task AplicarPagoCtaCteAsync(Comprobante cbte)
+    {
+        if (cbte.IdCliente is not > 0 || cbte.Pagos.Count == 0) return;
+
+        var idsMedioPago = cbte.Pagos.Select(p => p.IdMedioPago).Distinct().ToList();
+        var mediosCtaCte = await db.MediosPago
+            .Where(m => idsMedioPago.Contains(m.Id) && m.Tipo == TipoMedioPago.CtaCte)
+            .Select(m => m.Id)
+            .ToListAsync();
+        if (mediosCtaCte.Count == 0) return;
+
+        var monto = cbte.Pagos.Where(p => mediosCtaCte.Contains(p.IdMedioPago)).Sum(p => p.Importe);
+        if (monto <= 0) return;
+
+        var cliente = await db.Clientes.FindAsync(cbte.IdCliente);
+        if (cliente is null) return;
+
+        cliente.SaldoCtaCte += monto;
+        cliente.EsMoroso = cliente.SaldoCtaCte > 0 && DateTime.UtcNow > (cliente.FechaVtoCtaCte ?? DateTime.MaxValue);
+
+        db.MovimientosCtaCte.Add(new MovimientoCtaCte
+        {
+            IdCliente = cbte.IdCliente.Value,
+            Fecha = cbte.Fecha,
+            Tipo = TipoMovimientoCte.VentaCredito,
+            Concepto = $"Venta {cbte.Letra} {cbte.PuntoVenta:0000}-{cbte.Numero:00000000}",
+            IdComprobante = cbte.Id,
+            Debe = monto,
+            Haber = 0,
+            SaldoAcumulado = cliente.SaldoCtaCte,
+            IdUsuario = cbte.IdUsuario > 0 ? cbte.IdUsuario : null
+        });
+
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>Revierte el saldo de cuenta corriente cargado por una venta anulada, si corresponde.</summary>
+    private async Task RevertirPagoCtaCteAsync(Comprobante cbte, int idUsuario)
+    {
+        var mov = await db.MovimientosCtaCte
+            .Where(m => m.IdComprobante == cbte.Id && m.Tipo == TipoMovimientoCte.VentaCredito)
+            .FirstOrDefaultAsync();
+        if (mov is null) return;
+
+        var cliente = await db.Clientes.FindAsync(mov.IdCliente);
+        if (cliente is null) return;
+
+        cliente.SaldoCtaCte -= mov.Debe;
+        if (cliente.SaldoCtaCte < 0) cliente.SaldoCtaCte = 0;
+        cliente.EsMoroso = cliente.SaldoCtaCte > 0 && DateTime.UtcNow > (cliente.FechaVtoCtaCte ?? DateTime.MaxValue);
+
+        db.MovimientosCtaCte.Add(new MovimientoCtaCte
+        {
+            IdCliente = mov.IdCliente,
+            Fecha = DateTime.UtcNow,
+            Tipo = TipoMovimientoCte.NotaCredito,
+            Concepto = $"Anulación venta {cbte.Letra} {cbte.PuntoVenta:0000}-{cbte.Numero:00000000}",
+            IdComprobante = cbte.Id,
+            Debe = 0,
+            Haber = mov.Debe,
+            SaldoAcumulado = cliente.SaldoCtaCte,
+            IdUsuario = idUsuario > 0 ? idUsuario : null
         });
     }
 
@@ -179,6 +272,64 @@ public class VentasController(SuperPOSDbContext db, IHubContext<PosHub> hub, Afi
             return (96, dni);   // DNI
 
         return (99, 0);  // default Consumidor Final
+    }
+
+    /// <summary>
+    /// Determina tipo de documento y número del receptor para AFIP cuando el comprobante es
+    /// una nota a un PROVEEDOR (en vez de a un cliente).
+    /// </summary>
+    private static (int tipoDoc, long nroDoc) ObtenerDatosDocumentoAfipProveedor(Proveedor? proveedor)
+    {
+        if (proveedor is null || string.IsNullOrWhiteSpace(proveedor.Cuit))
+            return (99, 0);
+
+        var cuitLimpio = proveedor.Cuit.Replace("-", "").Replace(" ", "");
+        return cuitLimpio.Length == 11 && long.TryParse(cuitLimpio, out var cuit)
+            ? (80, cuit)
+            : (99, 0);
+    }
+
+    /// <summary>
+    /// Código de comprobante AFIP a partir del tipo configurado (usa CodigoAfip si está seedeado;
+    /// si no, lo deriva de la letra asumiendo Factura), aplicando FCE MiPyME si corresponde por comisión.
+    /// </summary>
+    private static int ObtenerCodigoAfip(TipoComprobante tipoCbte, char letra, decimal comision)
+    {
+        var codigoBase = tipoCbte.CodigoAfip ?? AfipService.ObtenerTipoComprobanteAfip(letra, TipoComprobanteAfip.Factura);
+        return AfipService.AplicarFceSiCorresponde(codigoBase, comision);
+    }
+
+    /// <summary>Guarda en la bitácora el resultado (o el error) de una llamada a AFIP para un comprobante.</summary>
+    private async Task RegistrarLogAfipAsync(long idComprobante, SolicitudCAEResult? resultado, string? errorExcepcion = null)
+    {
+        char estado;
+        string? detalle;
+        if (resultado is null)
+        {
+            estado = 'E';
+            detalle = errorExcepcion;
+        }
+        else if (resultado.Exito)
+        {
+            estado = resultado.Recuperado ? 'C' : 'A';
+            detalle = resultado.Observaciones;
+        }
+        else
+        {
+            estado = 'R';
+            detalle = resultado.Error;
+        }
+
+        db.ComprobantesAfipLog.Add(new ComprobanteAfipLog
+        {
+            IdComprobante = idComprobante,
+            Fecha = DateTime.UtcNow,
+            Resultado = estado,
+            Detalle = detalle,
+            RequestXml = resultado?.RequestXml,
+            ResponseXml = resultado?.ResponseXml
+        });
+        await db.SaveChangesAsync();
     }
 
     private static List<AfipIva> ObtenerIvas(Comprobante cbte)
@@ -222,7 +373,7 @@ public class VentasController(SuperPOSDbContext db, IHubContext<PosHub> hub, Afi
         var solicitud = new SolicitudCAE
         {
             PuntoVenta      = cbte.PuntoVenta,
-            TipoComprobante = AfipService.ObtenerTipoComprobanteAfip(cbte.Letra, TipoComprobanteAfip.Factura),
+            TipoComprobante = ObtenerCodigoAfip(tipoCbte, cbte.Letra, cbte.Comision),
             NroComprobante  = cbte.Numero,
             Fecha           = cbte.Fecha,
             Concepto        = 1,
@@ -235,6 +386,7 @@ public class VentasController(SuperPOSDbContext db, IHubContext<PosHub> hub, Afi
         };
 
         var resultado = await afip.SolicitarCAEAsync(solicitud);
+        await RegistrarLogAfipAsync(cbte.Id, resultado);
 
         if (resultado.Exito)
         {
@@ -248,6 +400,90 @@ public class VentasController(SuperPOSDbContext db, IHubContext<PosHub> hub, Afi
         }
 
         return BadRequest(new { Error = resultado.Error });
+    }
+
+    /// <summary>Bitácora de llamadas a AFIP (request/response) para un comprobante — para soporte/depuración.</summary>
+    [HttpGet("{id}/afip-log")]
+    public async Task<IActionResult> GetAfipLog(long id) =>
+        Ok(await db.ComprobantesAfipLog.Where(l => l.IdComprobante == id).OrderByDescending(l => l.Fecha).ToListAsync());
+
+    /// <summary>Registra una nota de débito/crédito emitida a un PROVEEDOR (no a un cliente) reusando el mismo circuito de AFIP.</summary>
+    [HttpPost("nota-proveedor")]
+    public async Task<IActionResult> RegistrarNotaProveedor([FromBody] Comprobante cbte)
+    {
+        if (cbte.IdProveedor is not > 0)
+            return BadRequest("IdProveedor es obligatorio para una nota a proveedor.");
+
+        var tipoCbte = await db.TiposComprobante.FindAsync(cbte.IdTipoComprobante);
+        if (tipoCbte is null) return BadRequest("Tipo de comprobante inválido.");
+
+        cbte.Fecha = DateTime.UtcNow;
+        cbte.Estado = EstadoComprobante.Emitido;
+        cbte.IdCliente = null;
+
+        var lockKey = $"cbte:{cbte.IdSucursal}:{cbte.PuntoVenta}:{cbte.IdTipoComprobante}:{cbte.Letra}";
+        await using (var tx = await db.Database.BeginTransactionAsync())
+        {
+            await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({lockKey}))");
+
+            var ultimo = await db.Comprobantes
+                .Where(c => c.PuntoVenta == cbte.PuntoVenta && c.IdTipoComprobante == cbte.IdTipoComprobante && c.Letra == cbte.Letra)
+                .MaxAsync(c => (long?)c.Numero) ?? 0;
+            cbte.Numero = ultimo + 1;
+
+            db.Comprobantes.Add(cbte);
+            await db.SaveChangesAsync();
+            await tx.CommitAsync();
+        }
+
+        if (tipoCbte.RequiereCAE)
+        {
+            try
+            {
+                var proveedor = await db.Proveedores.FindAsync(cbte.IdProveedor);
+                var cfg = await db.ConfiguracionEmpresa.FirstOrDefaultAsync();
+                var (tipoDoc, nroDoc) = ObtenerDatosDocumentoAfipProveedor(proveedor);
+                var neto = cbte.SubTotal - cbte.TotalDescuento;
+
+                var solicitud = new SolicitudCAE
+                {
+                    PuntoVenta      = cbte.PuntoVenta,
+                    TipoComprobante = ObtenerCodigoAfip(tipoCbte, cbte.Letra, comision: 0),
+                    NroComprobante  = cbte.Numero,
+                    Fecha           = cbte.Fecha,
+                    Concepto        = 1,
+                    TipoDocCliente  = tipoDoc,
+                    NroDocCliente   = nroDoc,
+                    ImporteNeto     = neto,
+                    ImporteIva      = cbte.TotalIva21 + cbte.TotalIva105,
+                    ImporteTotal    = cbte.Total,
+                    Ivas            = ObtenerIvas(cbte)
+                };
+
+                var resultado = await afip.SolicitarCAEAsync(solicitud);
+                await RegistrarLogAfipAsync(cbte.Id, resultado);
+                if (resultado.Exito)
+                {
+                    cbte.CAE            = long.TryParse(resultado.CAE, out var caeNum) ? caeNum : null;
+                    cbte.CAEVencimiento = resultado.FechaVencimientoCAE;
+                    cbte.QrAfip         = resultado.GenerarQRAfip(
+                        cfg?.Cuit ?? _config["Afip:CUIT"] ?? "",
+                        cbte.PuntoVenta, solicitud.TipoComprobante, cbte.Fecha, cbte.Total, tipoDoc, nroDoc);
+                    await db.SaveChangesAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                await RegistrarLogAfipAsync(cbte.Id, null, ex.Message);
+                Console.WriteLine($"[AFIP] Error al solicitar CAE (nota a proveedor): {ex.Message}");
+            }
+        }
+
+        return CreatedAtAction(nameof(GetById), new { id = cbte.Id }, new
+        {
+            cbte.Id, cbte.Numero, cbte.Letra, cbte.PuntoVenta, cbte.Fecha, cbte.Total,
+            cbte.CAE, cbte.CAEVencimiento, cbte.QrAfip, cbte.Estado
+        });
     }
 
     [HttpPost("{id}/anular")]
@@ -291,6 +527,8 @@ public class VentasController(SuperPOSDbContext db, IHubContext<PosHub> hub, Afi
                 FechaVencimiento = det.FechaVencimiento
             });
         }
+
+        await RevertirPagoCtaCteAsync(cbte, idUsuario);
 
         await db.SaveChangesAsync();
         return NoContent();
