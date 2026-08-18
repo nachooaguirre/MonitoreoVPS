@@ -11,6 +11,7 @@ IDR/
 # Ignorar bases de datos locales y backups pesados
 *.Mdb
 *.zip
+!SuperPOS/src/SuperPOS.API/wwwroot/downloads/*.zip
 descompilado/
 LA - Supermer*/
 LoginMarketNewAge*/
@@ -30,6 +31,7 @@ appsettings.*.local.json
 **/SuperPOS.Android/captures/
 **/SuperPOS.Android/**/.externalNativeBuild/
 **/SuperPOS.Android/**/.cxx/
+**/SuperPOS.Android/keystore/
 
 # Datos reales del cliente (CUIT, ventas, compras) usados para validar el exportador contable
 documentos_contabilidad/

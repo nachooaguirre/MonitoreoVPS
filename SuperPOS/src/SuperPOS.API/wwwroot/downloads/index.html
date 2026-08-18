@@ -2,25 +2,39 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>SuperPOS - Descargar cliente</title>
+<title>SuperPOS - Descargas</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
   body { font-family: -apple-system, Segoe UI, Arial, sans-serif; max-width: 560px; margin: 60px auto; padding: 0 20px; color: #1a1a1a; }
   h1 { font-size: 1.4rem; }
+  h2 { font-size: 1.1rem; margin-top: 40px; }
   .btn { display: inline-block; margin-top: 16px; padding: 12px 24px; background: #2563eb; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600; }
   .btn:hover { background: #1d4ed8; }
   .note { margin-top: 24px; font-size: 0.9rem; color: #555; line-height: 1.5; }
   code { background: #f1f1f1; padding: 2px 6px; border-radius: 4px; }
+  hr { margin: 40px 0; border: none; border-top: 1px solid #e5e5e5; }
 </style>
 </head>
 <body>
-  <h1>SuperPOS - Cliente de caja (WPF)</h1>
-  <p>Descargá el cliente para Windows. Se conecta directo a la API en este servidor.</p>
+  <h1>SuperPOS - Descargas</h1>
+
+  <h2>Cliente de caja (Windows / WPF)</h2>
+  <p>Se conecta directo a la API en este servidor.</p>
   <a class="btn" href="SuperPOS-Client-win-x64.zip">Descargar SuperPOS-Client-win-x64.zip</a>
   <div class="note">
     <p><strong>Requisito:</strong> esta build necesita el <strong>.NET 10 Desktop Runtime (x64)</strong> instalado en la PC. Si no lo tenés, descargalo primero desde
     <a href="https://dotnet.microsoft.com/download/dotnet/10.0" target="_blank" rel="noopener">dotnet.microsoft.com</a> (elegir "Desktop Runtime x64").</p>
     <p>Pasos: instalar el runtime (si hace falta) → descomprimir el zip → ejecutar <code>SuperPOS.Client.exe</code>.</p>
+  </div>
+
+  <hr>
+
+  <h2>App móvil (Android / colectoras)</h2>
+  <p>Para escaneo de código de barras, ingreso de stock y etiquetas desde colectoras Zebra o celulares Android.</p>
+  <a class="btn" href="SuperPOS-Mobile.apk">Descargar SuperPOS-Mobile.apk</a>
+  <div class="note">
+    <p>Firmado con certificado propio (no viene de Google Play). Al instalar, Android va a advertir "origen desconocido" — hay que permitirlo explícitamente en el instalador.</p>
+    <p>Compatible con Android 8.1 (API 26) o superior.</p>
   </div>
 </body>
 </html>
