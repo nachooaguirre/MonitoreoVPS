@@ -1,0 +1,96 @@
+name: Build downloads
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "SuperPOS/src/SuperPOS.Client/**"
+      - "SuperPOS/src/SuperPOS.Shared/**"
+      - "SuperPOS/src/SuperPOS.Fiscal/**"
+      - "SuperPOS/src/SuperPOS.Android/**"
+      - ".github/workflows/build-downloads.yml"
+  workflow_dispatch: {}
+
+jobs:
+  build-client:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Publish cliente WPF (framework-dependent)
+        run: dotnet publish SuperPOS/src/SuperPOS.Client/SuperPOS.Client.csproj -c Release -r win-x64 --self-contained false -o publish/client
+
+      - name: Comprimir
+        shell: pwsh
+        run: Compress-Archive -Path publish/client/* -DestinationPath SuperPOS-Client-win-x64.zip -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: client-zip
+          path: SuperPOS-Client-win-x64.zip
+
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Decodificar keystore
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "${{ runner.temp }}/superpos-release.jks"
+
+      - name: Build APK release (firmado)
+        working-directory: SuperPOS/src/SuperPOS.Android
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/superpos-release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: SuperPOS/src/SuperPOS.Android/app/build/outputs/apk/release/app-release.apk
+
+  publish-downloads:
+    needs: [build-client, build-android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: client-zip
+          path: dl
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+          path: dl
+
+      - name: Copiar a wwwroot/downloads
+        run: |
+          cp dl/SuperPOS-Client-win-x64.zip SuperPOS/src/SuperPOS.API/wwwroot/downloads/SuperPOS-Client-win-x64.zip
+          cp dl/app-release.apk SuperPOS/src/SuperPOS.API/wwwroot/downloads/SuperPOS-Mobile.apk
+
+      - name: Commit y push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add SuperPOS/src/SuperPOS.API/wwwroot/downloads/SuperPOS-Client-win-x64.zip SuperPOS/src/SuperPOS.API/wwwroot/downloads/SuperPOS-Mobile.apk
+          git diff --staged --quiet && echo "Sin cambios en los binarios" || git commit -m "chore: actualizar descargas (build automatico) [skip ci]"
+          git push origin main
