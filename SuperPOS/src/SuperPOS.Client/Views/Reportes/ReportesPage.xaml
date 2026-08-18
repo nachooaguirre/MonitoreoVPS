@@ -727,6 +727,228 @@
                     </Border>
                 </Grid>
             </TabItem>
+            <!-- ===================== TAB 5: CALENDARIO DE PAGOS ===================== -->
+            <TabItem Header="💳  Calendario de Pagos">
+                <Grid Margin="16,12,16,12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Filtros -->
+                    <Border Grid.Row="0" Background="#1E1E1E" CornerRadius="10" Padding="14,10" Margin="0,0,0,14">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Proveedor:" Foreground="#808090" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <ComboBox x:Name="CboProveedorCalendario" Width="260" Height="32" DisplayMemberPath="RazonSocial" SelectedValuePath="Id"/>
+                            <ui:Button Content="  Consultar" Margin="12,0,0,0" Height="32" Padding="16,0" Click="BtnCalendarioPagos_Click"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- KPIs -->
+                    <Grid Grid.Row="1" Margin="0,0,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Style="{StaticResource KpiCard}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource KpiLabel}" Text="TOTAL PENDIENTE DE PAGO"/>
+                                <TextBlock x:Name="TxtTotalPendientePago" Style="{StaticResource KpiValue}" Foreground="#60B4FF" Text="$ --"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource KpiCard}" Grid.Column="1">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource KpiLabel}" Text="FACTURAS PENDIENTES"/>
+                                <TextBlock x:Name="TxtCantPendientes" Style="{StaticResource KpiValue}" Foreground="#40D080" Text="--"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource KpiCard}" Grid.Column="2">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource KpiLabel}" Text="VENCIDAS"/>
+                                <TextBlock x:Name="TxtCantVencidas" Style="{StaticResource KpiValue}" Foreground="#FF5050" Text="--"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <!-- Tabla -->
+                    <Border Grid.Row="2" Background="#1E1E1E" CornerRadius="12" Padding="16">
+                        <DataGrid x:Name="DgCalendarioPagos" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
+                                  Background="#141414" Foreground="#F0F0FF" FontSize="13"
+                                  RowBackground="#1E1E1E" AlternatingRowBackground="#252525"
+                                  HorizontalGridLinesBrush="#333333" BorderThickness="0" RowHeight="38">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="PROVEEDOR" Binding="{Binding Proveedor}" Width="*">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="Padding" Value="8,0"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="FACTURA" Width="130">
+                                    <DataGridTextColumn.Binding>
+                                        <MultiBinding StringFormat="{}{0}{1}">
+                                            <Binding Path="LetraFactura"/>
+                                            <Binding Path="NumeroFactura"/>
+                                        </MultiBinding>
+                                    </DataGridTextColumn.Binding>
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="Foreground" Value="#7090B0"/>
+                                            <Setter Property="Padding" Value="8,0"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="VENCIMIENTO" Binding="{Binding FechaVencimiento, StringFormat='dd/MM/yyyy'}" Width="110">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="Padding" Value="8,0"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTemplateColumn Header="ESTADO" Width="130">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Border CornerRadius="4" Padding="8,4" Margin="4" HorizontalAlignment="Left">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="#1A3A1A"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Vencida}" Value="True">
+                                                                <Setter Property="Background" Value="#3A1A1A"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <TextBlock FontSize="12" FontWeight="Bold">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Foreground" Value="#40D080"/>
+                                                            <Setter Property="Text" Value="{Binding DiasParaVencer, StringFormat='Vence en {0}d'}"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Vencida}" Value="True">
+                                                                    <Setter Property="Foreground" Value="#FF5050"/>
+                                                                    <Setter Property="Text" Value="VENCIDA"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </Border>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="TOTAL" Binding="{Binding Total, StringFormat='$ #,##0.00'}" Width="130">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="HorizontalAlignment" Value="Right"/>
+                                            <Setter Property="FontWeight" Value="Bold"/>
+                                            <Setter Property="Foreground" Value="#60B4FF"/>
+                                            <Setter Property="Padding" Value="0,0,12,0"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTemplateColumn Header="" Width="110">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <ui:Button Content="Marcar pagada" Appearance="Primary" Height="28" FontSize="11" Padding="10,0"
+                                                       Click="BtnMarcarPagada_Click" Tag="{Binding}"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- ===================== TAB 6: RENTABILIDAD POR PROVEEDOR ===================== -->
+            <TabItem Header="🤝  Rentabilidad Proveedores">
+                <Grid Margin="16,12,16,12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Filtros -->
+                    <Border Grid.Row="0" Background="#1E1E1E" CornerRadius="10" Padding="14,10" Margin="0,0,0,14">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Desde:" Foreground="#808090" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <DatePicker x:Name="DpRentabilidadDesde" Height="32" FontSize="13" Foreground="#F0F0F0" Background="#252540"/>
+                            <TextBlock Text="Hasta:" Foreground="#808090" VerticalAlignment="Center" Margin="16,0,8,0"/>
+                            <DatePicker x:Name="DpRentabilidadHasta" Height="32" FontSize="13" Foreground="#F0F0F0" Background="#252540"/>
+                            <ui:Button Content="  Consultar" Margin="12,0,0,0" Height="32" Padding="16,0" Click="BtnRentabilidadProveedores_Click"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Tabla -->
+                    <Border Grid.Row="1" Background="#1E1E1E" CornerRadius="12" Padding="16">
+                        <DataGrid x:Name="DgRentabilidadProveedores" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
+                                  Background="#141414" Foreground="#F0F0FF" FontSize="13"
+                                  RowBackground="#1E1E1E" AlternatingRowBackground="#252525"
+                                  HorizontalGridLinesBrush="#333333" BorderThickness="0" RowHeight="36">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="PROVEEDOR" Binding="{Binding Proveedor}" Width="*">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="Padding" Value="8,0"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="COMPRADO" Binding="{Binding TotalComprado, StringFormat='$ #,##0'}" Width="140">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="HorizontalAlignment" Value="Right"/>
+                                            <Setter Property="Foreground" Value="#FFB040"/>
+                                            <Setter Property="Padding" Value="0,0,12,0"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="VENDIDO" Binding="{Binding TotalVendido, StringFormat='$ #,##0'}" Width="140">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="HorizontalAlignment" Value="Right"/>
+                                            <Setter Property="Foreground" Value="#60B4FF"/>
+                                            <Setter Property="Padding" Value="0,0,12,0"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="COSTO VENDIDO" Binding="{Binding CostoVendido, StringFormat='$ #,##0'}" Width="140">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="HorizontalAlignment" Value="Right"/>
+                                            <Setter Property="Foreground" Value="#808090"/>
+                                            <Setter Property="Padding" Value="0,0,12,0"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="MARGEN REAL" Binding="{Binding MargenReal, StringFormat='$ #,##0'}" Width="140">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="HorizontalAlignment" Value="Right"/>
+                                            <Setter Property="FontWeight" Value="Bold"/>
+                                            <Setter Property="Foreground" Value="#40D080"/>
+                                            <Setter Property="Padding" Value="0,0,12,0"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Border>
+                </Grid>
+            </TabItem>
         </TabControl>
     </Grid>
 </Page>

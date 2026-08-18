@@ -30,6 +30,21 @@ public class MovimientosResult
     public List<MovimientoDto> Items { get; set; } = [];
 }
 
+// Calendario de pagos a proveedores
+public class CalendarioPagoDto
+{
+    public long Id { get; set; }
+    public string? NumeroFactura { get; set; }
+    public string? LetraFactura { get; set; }
+    public DateTime Fecha { get; set; }
+    public DateTime? FechaVencimiento { get; set; }
+    public decimal Total { get; set; }
+    public int IdProveedor { get; set; }
+    public string Proveedor { get; set; } = "";
+    public int? DiasParaVencer { get; set; }
+    public bool Vencida { get; set; }
+}
+
 // Reportes
 public class VentasDiaDto
 {
@@ -68,6 +83,23 @@ public class RankingProductoDto
     public string Descripcion { get; set; } = "";
     public decimal CantVendida { get; set; }
     public decimal TotalVendido { get; set; }
+}
+
+public class RentabilidadProveedoresResult
+{
+    public DateTime Desde { get; set; }
+    public DateTime Hasta { get; set; }
+    public List<RentabilidadProveedorDto> Proveedores { get; set; } = [];
+}
+
+public class RentabilidadProveedorDto
+{
+    public int IdProveedor { get; set; }
+    public string Proveedor { get; set; } = "";
+    public decimal TotalComprado { get; set; }
+    public decimal TotalVendido { get; set; }
+    public decimal CostoVendido { get; set; }
+    public decimal MargenReal { get; set; }
 }
 
 public class StockBajoMinimoResult

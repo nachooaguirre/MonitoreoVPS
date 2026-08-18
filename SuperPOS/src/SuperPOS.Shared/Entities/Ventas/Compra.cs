@@ -27,6 +27,7 @@ public class Compra
     public string? NombreCorredor { get; set; }
     public decimal Total { get; set; }
     public string? Observaciones { get; set; }
+    public bool Pagada { get; set; }
 
     public Proveedor? Proveedor { get; set; }
     public TipoComprobante? TipoComprobante { get; set; }

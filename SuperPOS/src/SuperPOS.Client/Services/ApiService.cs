@@ -417,6 +417,26 @@ public class ApiService
     public async Task<StockBajoMinimoResult?> GetStockBajoMinimo() =>
         await _http.GetFromJsonAsync<StockBajoMinimoResult>("api/reportes/stock-bajo-minimo", _json);
 
+    public async Task<RentabilidadProveedoresResult?> GetRentabilidadProveedores(DateTime desde, DateTime hasta, int? idProveedor = null)
+    {
+        var url = $"api/reportes/rentabilidad-proveedor?desde={desde:yyyy-MM-dd}&hasta={hasta:yyyy-MM-dd}";
+        if (idProveedor.HasValue) url += $"&idProveedor={idProveedor.Value}";
+        return await _http.GetFromJsonAsync<RentabilidadProveedoresResult>(url, _json);
+    }
+
+    // === CALENDARIO DE PAGOS A PROVEEDORES ===
+    public async Task<List<CalendarioPagoDto>?> GetCalendarioPagos(int? idProveedor = null)
+    {
+        var url = "api/compras/calendario-pagos" + (idProveedor.HasValue ? $"?idProveedor={idProveedor.Value}" : "");
+        return await _http.GetFromJsonAsync<List<CalendarioPagoDto>>(url, _json);
+    }
+
+    public async Task RegistrarPagoCompra(int idProveedor, decimal monto, string? concepto, int idUsuario, long idCompra)
+    {
+        var r = await _http.PostAsJsonAsync("api/ctacte-proveedores/pago", new { idProveedor, monto, concepto, idUsuario, idCompra });
+        r.EnsureSuccessStatusCode();
+    }
+
 
 
     public async Task<Comprobante?> GetVentaById(long id) =>

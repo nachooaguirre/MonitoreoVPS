@@ -47,6 +47,10 @@ public class ComprasController(SuperPOSDbContext db) : ControllerBase
         compra.TotalIva = compra.Detalles.Sum(d => d.Cantidad * d.PrecioCostoNeto * (d.AlicuotaIva / 100));
         compra.Total = compra.SubTotal + compra.TotalIva;
 
+        // Estimacion provisoria del vencimiento de pago (se recalcula al recibirla).
+        var proveedor = await db.Proveedores.FindAsync(compra.IdProveedor);
+        compra.FechaVencimiento = compra.Fecha.AddDays(proveedor?.DiasVencimientoPago ?? 0);
+
         db.Compras.Add(compra);
         await db.SaveChangesAsync();
         return CreatedAtAction(nameof(GetById), new { id = compra.Id }, compra);
@@ -78,6 +82,9 @@ public class ComprasController(SuperPOSDbContext db) : ControllerBase
         compra.Estado = EstadoCompra.Recibida;
 
         var proveedor = await db.Proveedores.FindAsync(compra.IdProveedor);
+        if (proveedor != null)
+            compra.FechaVencimiento = DateTime.UtcNow.AddDays(proveedor.DiasVencimientoPago);
+
         if (proveedor != null && compra.Total > 0)
         {
             proveedor.SaldoCtaCte += compra.Total;
@@ -96,6 +103,45 @@ public class ComprasController(SuperPOSDbContext db) : ControllerBase
 
         await db.SaveChangesAsync();
         return NoContent();
+    }
+
+    /// <summary>Compras recibidas y pendientes de pago, ordenadas por fecha de vencimiento.</summary>
+    [HttpGet("calendario-pagos")]
+    public async Task<IActionResult> CalendarioPagos([FromQuery] int? idProveedor)
+    {
+        var q = db.Compras
+            .Include(c => c.Proveedor)
+            .Where(c => c.Estado == EstadoCompra.Recibida && !c.Pagada);
+        if (idProveedor.HasValue) q = q.Where(c => c.IdProveedor == idProveedor.Value);
+
+        var hoy = DateTime.UtcNow.Date;
+        var items = await q.OrderBy(c => c.FechaVencimiento).Select(c => new
+        {
+            c.Id,
+            c.NumeroFactura,
+            c.LetraFactura,
+            c.Fecha,
+            c.FechaVencimiento,
+            c.Total,
+            IdProveedor = c.IdProveedor,
+            Proveedor = c.Proveedor!.RazonSocial,
+        }).ToListAsync();
+
+        var resultado = items.Select(c => new
+        {
+            c.Id,
+            c.NumeroFactura,
+            c.LetraFactura,
+            c.Fecha,
+            c.FechaVencimiento,
+            c.Total,
+            c.IdProveedor,
+            c.Proveedor,
+            DiasParaVencer = c.FechaVencimiento.HasValue ? (c.FechaVencimiento.Value.Date - hoy).Days : (int?)null,
+            Vencida = c.FechaVencimiento.HasValue && c.FechaVencimiento.Value.Date < hoy
+        });
+
+        return Ok(resultado);
     }
 
     [HttpPost("{id}/anular")]

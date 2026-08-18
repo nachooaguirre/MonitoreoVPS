@@ -53,10 +53,17 @@ public class CtaCteProveedoresController(SuperPOSDbContext db) : ControllerBase
             Haber = req.Monto,
             Debe = 0,
             SaldoAcumulado = proveedor.SaldoCtaCte,
-            IdUsuario = req.IdUsuario
+            IdUsuario = req.IdUsuario,
+            IdCompra = req.IdCompra
         };
-
         db.MovimientosCtaCteProveedor.Add(mov);
+
+        if (req.IdCompra.HasValue)
+        {
+            var compra = await db.Compras.FindAsync(req.IdCompra.Value);
+            if (compra != null) compra.Pagada = true;
+        }
+
         await db.SaveChangesAsync();
         return Ok(new { nuevoSaldo = proveedor.SaldoCtaCte });
     }
@@ -91,5 +98,5 @@ public class CtaCteProveedoresController(SuperPOSDbContext db) : ControllerBase
     }
 }
 
-public record PagoCtaCteProveedorRequest(int IdProveedor, decimal Monto, string? Concepto, int? IdUsuario);
+public record PagoCtaCteProveedorRequest(int IdProveedor, decimal Monto, string? Concepto, int? IdUsuario, long? IdCompra = null);
 public record AjusteCtaCteProveedorRequest(int IdProveedor, decimal Monto, bool EsDebito, string? Concepto, int? IdUsuario);

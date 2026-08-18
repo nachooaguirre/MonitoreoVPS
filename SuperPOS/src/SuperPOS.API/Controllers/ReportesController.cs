@@ -157,6 +157,72 @@ public class ReportesController(SuperPOSDbContext db) : ControllerBase
         return Ok(data);
     }
 
+    /// <summary>
+    /// Compras vs ventas y margen real por proveedor en un período. Sin idProveedor
+    /// devuelve el ranking de todos los proveedores con actividad en el período.
+    /// </summary>
+    [HttpGet("rentabilidad-proveedor")]
+    public async Task<IActionResult> RentabilidadProveedor(
+        [FromQuery] DateTime desde, [FromQuery] DateTime hasta, [FromQuery] int? idProveedor)
+    {
+        var desdeUtc = DateTime.SpecifyKind(desde.ToUtc().Date, DateTimeKind.Utc);
+        var hastaUtc = DateTime.SpecifyKind(hasta.ToUtc().Date.AddDays(1), DateTimeKind.Utc);
+
+        var comprasQ = db.Compras
+            .Where(c => c.Fecha >= desdeUtc && c.Fecha < hastaUtc && c.Estado != EstadoCompra.Anulada);
+        if (idProveedor.HasValue) comprasQ = comprasQ.Where(c => c.IdProveedor == idProveedor.Value);
+
+        var compras = await comprasQ
+            .GroupBy(c => c.IdProveedor)
+            .Select(g => new { IdProveedor = g.Key, TotalComprado = g.Sum(c => c.Total) })
+            .ToListAsync();
+
+        var ventasQ = db.ComprobantesDetalle
+            .Where(d => d.Comprobante!.Fecha >= desdeUtc && d.Comprobante.Fecha < hastaUtc
+                     && d.Comprobante.Estado != EstadoComprobante.Anulado
+                     && d.Articulo != null);
+        if (idProveedor.HasValue) ventasQ = ventasQ.Where(d => d.Articulo!.IdProveedor == idProveedor.Value);
+
+        var ventas = await ventasQ
+            .GroupBy(d => d.Articulo!.IdProveedor)
+            .Select(g => new
+            {
+                IdProveedor = g.Key,
+                TotalVendido = g.Sum(d => d.SubTotal),
+                CostoVendido = g.Sum(d => d.Cantidad * d.Articulo!.PrecioCosto)
+            })
+            .ToListAsync();
+
+        var proveedorIds = compras.Select(c => c.IdProveedor)
+            .Union(ventas.Select(v => v.IdProveedor))
+            .ToList();
+        var nombres = await db.Proveedores
+            .Where(p => proveedorIds.Contains(p.Id))
+            .Select(p => new { p.Id, p.RazonSocial })
+            .ToDictionaryAsync(p => p.Id, p => p.RazonSocial);
+
+        var resultado = proveedorIds.Select(id =>
+        {
+            var compra = compras.FirstOrDefault(c => c.IdProveedor == id);
+            var venta = ventas.FirstOrDefault(v => v.IdProveedor == id);
+            var totalVendido = venta?.TotalVendido ?? 0;
+            var costoVendido = venta?.CostoVendido ?? 0;
+            return new
+            {
+                idProveedor = id,
+                proveedor = nombres.GetValueOrDefault(id, "(desconocido)"),
+                totalComprado = compra?.TotalComprado ?? 0,
+                totalVendido,
+                costoVendido,
+                margenReal = totalVendido - costoVendido
+            };
+        })
+        .OrderByDescending(r => r.margenReal)
+        .ToList();
+
+        return Ok(new { desde, hasta, proveedores = resultado });
+    }
+
     /// <summary>Libro IVA Ventas: comprobantes en período con desglose de alícuotas.</summary>
     [HttpGet("libro-iva-ventas")]
     public async Task<IActionResult> LibroIvaVentas([FromQuery] DateTime desde, [FromQuery] DateTime hasta)

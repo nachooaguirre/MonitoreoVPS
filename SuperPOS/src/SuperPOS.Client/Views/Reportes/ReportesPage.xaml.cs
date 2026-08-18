@@ -6,6 +6,7 @@ using LiveChartsCore.SkiaSharpView.Painting;
 using LiveChartsCore.SkiaSharpView.WPF;
 using SkiaSharp;
 using SuperPOS.Client.Models;
+using SuperPOS.Client.Services;
 using SuperPOS.Shared.Entities.Ventas;
 
 namespace SuperPOS.Client.Views.Reportes;
@@ -22,12 +23,17 @@ public partial class ReportesPage : Page
         DpHasta.SelectedDate         = DateTime.Today;
         DpRankingDesde.SelectedDate  = DateTime.Today.AddMonths(-1);
         DpRankingHasta.SelectedDate  = DateTime.Today;
+        DpRentabilidadDesde.SelectedDate = DateTime.Today.AddMonths(-1);
+        DpRentabilidadHasta.SelectedDate = DateTime.Today;
 
         Loaded += async (_, _) =>
         {
             await ConsultarVentasDia();
             await ConsultarHistorial();
             await ConsultarStockBajo();
+            await CargarProveedoresCalendario();
+            await ConsultarCalendarioPagos();
+            await ConsultarRentabilidadProveedores();
         };
     }
 
@@ -37,6 +43,8 @@ public partial class ReportesPage : Page
     private async void BtnPeriodo_Click(object s, RoutedEventArgs e)   => await ConsultarPeriodo();
     private async void BtnRanking_Click(object s, RoutedEventArgs e)   => await ConsultarRanking();
     private async void BtnStockBajo_Click(object s, RoutedEventArgs e) => await ConsultarStockBajo();
+    private async void BtnCalendarioPagos_Click(object s, RoutedEventArgs e) => await ConsultarCalendarioPagos();
+    private async void BtnRentabilidadProveedores_Click(object s, RoutedEventArgs e) => await ConsultarRentabilidadProveedores();
 
     // ─── Paleta de colores para gráficos ──────────────────────
     private static readonly SKColor[] Paleta = [
@@ -382,6 +390,65 @@ public partial class ReportesPage : Page
         {
             MessageBox.Show($"Error al anular la venta: {ex.Message}");
         }
+    }
+
+    // ─── TAB CALENDARIO DE PAGOS ──────────────────────────────
+    private async Task CargarProveedoresCalendario()
+    {
+        try
+        {
+            var proveedores = await App.Api.GetProveedoresLista() ?? [];
+            var conTodos = new List<ProveedorSimple> { new() { Id = 0, RazonSocial = "(Todos los proveedores)" } };
+            conTodos.AddRange(proveedores);
+            CboProveedorCalendario.ItemsSource = conTodos;
+            CboProveedorCalendario.SelectedIndex = 0;
+        }
+        catch (Exception ex) { MessageBox.Show($"Error al cargar proveedores: {ex.Message}"); }
+    }
+
+    private async Task ConsultarCalendarioPagos()
+    {
+        try
+        {
+            var idProveedor = CboProveedorCalendario.SelectedValue is int id && id > 0 ? id : (int?)null;
+            var items = await App.Api.GetCalendarioPagos(idProveedor) ?? [];
+            DgCalendarioPagos.ItemsSource = items;
+
+            TxtTotalPendientePago.Text = items.Sum(i => i.Total).ToString("$ #,##0.00");
+            TxtCantPendientes.Text = items.Count.ToString();
+            TxtCantVencidas.Text = items.Count(i => i.Vencida).ToString();
+        }
+        catch (Exception ex) { MessageBox.Show($"Error: {ex.Message}"); }
+    }
+
+    private async void BtnMarcarPagada_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement fe || fe.Tag is not CalendarioPagoDto c) return;
+
+        if (MessageBox.Show($"¿Confirmás el pago de {c.Total:$ #,##0.00} a {c.Proveedor}?",
+            "Marcar como pagada", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            return;
+
+        try
+        {
+            await App.Api.RegistrarPagoCompra(c.IdProveedor, c.Total,
+                $"Pago factura {c.LetraFactura}{c.NumeroFactura}", App.IdUsuarioActual, c.Id);
+            await ConsultarCalendarioPagos();
+        }
+        catch (Exception ex) { MessageBox.Show($"Error al registrar el pago: {ex.Message}"); }
+    }
+
+    // ─── TAB RENTABILIDAD POR PROVEEDOR ───────────────────────
+    private async Task ConsultarRentabilidadProveedores()
+    {
+        try
+        {
+            var desde = DpRentabilidadDesde.SelectedDate ?? DateTime.Today.AddMonths(-1);
+            var hasta = DpRentabilidadHasta.SelectedDate ?? DateTime.Today;
+            var r = await App.Api.GetRentabilidadProveedores(desde, hasta);
+            DgRentabilidadProveedores.ItemsSource = r?.Proveedores ?? [];
+        }
+        catch (Exception ex) { MessageBox.Show($"Error: {ex.Message}"); }
     }
 
     // ─── Helpers ──────────────────────────────────────────────
