@@ -1,8 +1,6 @@
 package com.superpos.mobile.ui.screens
 
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,6 +23,7 @@ import com.superpos.mobile.data.api.ApiConfig
 import com.superpos.mobile.models.LoginRequest
 import com.superpos.mobile.models.User
 import com.superpos.mobile.ui.theme.*
+import com.superpos.mobile.util.AppUpdater
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -53,7 +52,11 @@ fun LoginScreen(
     // Read API URL from preferences
     val apiUrl = remember { mutableStateOf("") }
     var updateDisponible by remember { mutableStateOf(false) }
-    var updateDownloadUrl by remember { mutableStateOf("") }
+    var updateApkUrl by remember { mutableStateOf("") }
+    var descargandoUpdate by remember { mutableStateOf(false) }
+    var progresoDescarga by remember { mutableStateOf(0) }
+    var errorUpdate by remember { mutableStateOf<String?>(null) }
+
     LaunchedEffect(Unit) {
         apiUrl.value = sharedPrefs.getString(ApiConfig.KEY_API_URL, ApiConfig.DEFAULT_BASE_URL) ?: ApiConfig.DEFAULT_BASE_URL
 
@@ -65,7 +68,7 @@ fun LoginScreen(
                 conn.readTimeout = 4000
                 val remoteVersion = conn.inputStream.bufferedReader().readText().trim()
                 if (remoteVersion.isNotBlank() && remoteVersion != BuildConfig.APP_VERSION) {
-                    updateDownloadUrl = "$baseServidor/downloads/"
+                    updateApkUrl = "$baseServidor/downloads/SuperPOS-Mobile.apk"
                     updateDisponible = true
                 }
             } catch (_: Exception) {
@@ -76,17 +79,52 @@ fun LoginScreen(
 
     if (updateDisponible) {
         AlertDialog(
-            onDismissRequest = { updateDisponible = false },
+            onDismissRequest = { if (!descargandoUpdate) updateDisponible = false },
             title = { Text("Actualización disponible") },
-            text = { Text("Hay una nueva versión de SuperPOS Mobile disponible para descargar.") },
+            text = {
+                Column {
+                    Text(
+                        if (descargandoUpdate) "Descargando actualización... $progresoDescarga%"
+                        else "Hay una nueva versión de SuperPOS Mobile. Se va a descargar e instalar."
+                    )
+                    if (descargandoUpdate) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        LinearProgressIndicator(
+                            progress = { progresoDescarga / 100f },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    errorUpdate?.let {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(it, color = FluentError, fontSize = 12.sp)
+                    }
+                }
+            },
             confirmButton = {
-                TextButton(onClick = {
-                    updateDisponible = false
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(updateDownloadUrl)))
-                }) { Text("Descargar") }
+                TextButton(
+                    enabled = !descargandoUpdate,
+                    onClick = {
+                        descargandoUpdate = true
+                        errorUpdate = null
+                        scope.launch {
+                            try {
+                                withContext(Dispatchers.IO) {
+                                    AppUpdater.downloadAndInstall(context, updateApkUrl) { pct ->
+                                        progresoDescarga = pct
+                                    }
+                                }
+                                updateDisponible = false
+                            } catch (e: Exception) {
+                                errorUpdate = "No se pudo descargar: ${e.message}"
+                            } finally {
+                                descargandoUpdate = false
+                            }
+                        }
+                    }
+                ) { Text("Descargar e instalar") }
             },
             dismissButton = {
-                TextButton(onClick = { updateDisponible = false }) { Text("Ahora no") }
+                TextButton(enabled = !descargandoUpdate, onClick = { updateDisponible = false }) { Text("Ahora no") }
             }
         )
     }
