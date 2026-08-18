@@ -16,6 +16,7 @@ android {
         versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "APP_VERSION", "\"${System.getenv("APP_VERSION") ?: "dev"}\"")
         vectorDrawables {
             useSupportLibrary = true
         }

@@ -1,6 +1,8 @@
 package com.superpos.mobile.ui.screens
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,6 +19,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.superpos.mobile.BuildConfig
 import com.superpos.mobile.data.api.ApiClient
 import com.superpos.mobile.data.api.ApiConfig
 import com.superpos.mobile.models.LoginRequest
@@ -25,6 +28,8 @@ import com.superpos.mobile.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.net.HttpURLConnection
+import java.net.URL
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,11 +49,46 @@ fun LoginScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     
     val scope = rememberCoroutineScope()
-    
+
     // Read API URL from preferences
     val apiUrl = remember { mutableStateOf("") }
+    var updateDisponible by remember { mutableStateOf(false) }
+    var updateDownloadUrl by remember { mutableStateOf("") }
     LaunchedEffect(Unit) {
         apiUrl.value = sharedPrefs.getString(ApiConfig.KEY_API_URL, ApiConfig.DEFAULT_BASE_URL) ?: ApiConfig.DEFAULT_BASE_URL
+
+        val baseServidor = apiUrl.value.removeSuffix("/").removeSuffix("/api")
+        withContext(Dispatchers.IO) {
+            try {
+                val conn = URL("$baseServidor/downloads/mobile-version.txt").openConnection() as HttpURLConnection
+                conn.connectTimeout = 4000
+                conn.readTimeout = 4000
+                val remoteVersion = conn.inputStream.bufferedReader().readText().trim()
+                if (remoteVersion.isNotBlank() && remoteVersion != BuildConfig.APP_VERSION) {
+                    updateDownloadUrl = "$baseServidor/downloads/"
+                    updateDisponible = true
+                }
+            } catch (_: Exception) {
+                // Sin conexion o servidor caido: no molestar en el login.
+            }
+        }
+    }
+
+    if (updateDisponible) {
+        AlertDialog(
+            onDismissRequest = { updateDisponible = false },
+            title = { Text("Actualización disponible") },
+            text = { Text("Hay una nueva versión de SuperPOS Mobile disponible para descargar.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    updateDisponible = false
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(updateDownloadUrl)))
+                }) { Text("Descargar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { updateDisponible = false }) { Text("Ahora no") }
+            }
+        )
     }
 
     Scaffold(

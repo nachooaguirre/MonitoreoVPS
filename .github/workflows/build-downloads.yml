@@ -24,6 +24,11 @@ jobs:
       - name: Publish cliente WPF (framework-dependent)
         run: dotnet publish SuperPOS/src/SuperPOS.Client/SuperPOS.Client.csproj -c Release -r win-x64 --self-contained false -o publish/client
 
+      - name: Escribir version.txt
+        shell: pwsh
+        run: |
+          Set-Content -Path publish/client/version.txt -Value "${{ github.sha }}" -NoNewline -Encoding utf8
+
       - name: Comprimir
         shell: pwsh
         run: Compress-Archive -Path publish/client/* -DestinationPath SuperPOS-Client-win-x64.zip -Force
@@ -53,6 +58,7 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          APP_VERSION: ${{ github.sha }}
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
@@ -86,11 +92,12 @@ jobs:
         run: |
           cp dl/SuperPOS-Client-win-x64.zip SuperPOS/src/SuperPOS.API/wwwroot/downloads/SuperPOS-Client-win-x64.zip
           cp dl/app-release.apk SuperPOS/src/SuperPOS.API/wwwroot/downloads/SuperPOS-Mobile.apk
+          printf '%s' "${{ github.sha }}" > SuperPOS/src/SuperPOS.API/wwwroot/downloads/mobile-version.txt
 
       - name: Commit y push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add SuperPOS/src/SuperPOS.API/wwwroot/downloads/SuperPOS-Client-win-x64.zip SuperPOS/src/SuperPOS.API/wwwroot/downloads/SuperPOS-Mobile.apk
+          git add SuperPOS/src/SuperPOS.API/wwwroot/downloads/SuperPOS-Client-win-x64.zip SuperPOS/src/SuperPOS.API/wwwroot/downloads/SuperPOS-Mobile.apk SuperPOS/src/SuperPOS.API/wwwroot/downloads/mobile-version.txt
           git diff --staged --quiet && echo "Sin cambios en los binarios" || git commit -m "chore: actualizar descargas (build automatico) [skip ci]"
           git push origin main

@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
+using SuperPOS.Client.Services;
 using Wpf.Ui.Controls;
 
 namespace SuperPOS.Client.Views;
@@ -13,6 +14,7 @@ public partial class LoginWindow : FluentWindow
         InitializeComponent();
         CargarLogo();
         TxtUsuario.Focus();
+        _ = UpdateChecker.CheckAsync(App.ApiBaseUrl);
     }
 
     private void CargarLogo()
