@@ -118,8 +118,11 @@ else
     });
 }
 
+var staticFileTypes = new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider();
+staticFileTypes.Mappings[".apk"] = "application/vnd.android.package-archive";
+
 app.UseDefaultFiles();
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions { ContentTypeProvider = staticFileTypes });
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
