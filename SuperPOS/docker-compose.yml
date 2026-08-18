@@ -30,5 +30,16 @@ services:
       timeout: 5s
       retries: 10
 
+  filebrowser:
+    image: filebrowser/filebrowser:latest
+    restart: unless-stopped
+    ports:
+      - "5076:80"
+    volumes:
+      - filebrowser_files:/srv
+      - filebrowser_db:/database
+
 volumes:
   superpos_db_data:
+  filebrowser_files:
+  filebrowser_db:
