@@ -118,6 +118,7 @@ else
     });
 }
 
+app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseCors();
 app.UseAuthentication();
