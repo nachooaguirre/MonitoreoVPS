@@ -93,11 +93,12 @@ jobs:
           cp dl/SuperPOS-Client-win-x64.zip SuperPOS/src/SuperPOS.API/wwwroot/downloads/SuperPOS-Client-win-x64.zip
           cp dl/app-release.apk SuperPOS/src/SuperPOS.API/wwwroot/downloads/SuperPOS-Mobile.apk
           printf '%s' "${{ github.sha }}" > SuperPOS/src/SuperPOS.API/wwwroot/downloads/mobile-version.txt
+          printf '%s' "${{ github.sha }}" > SuperPOS/src/SuperPOS.API/wwwroot/downloads/client-version.txt
 
       - name: Commit y push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add SuperPOS/src/SuperPOS.API/wwwroot/downloads/SuperPOS-Client-win-x64.zip SuperPOS/src/SuperPOS.API/wwwroot/downloads/SuperPOS-Mobile.apk SuperPOS/src/SuperPOS.API/wwwroot/downloads/mobile-version.txt
+          git add SuperPOS/src/SuperPOS.API/wwwroot/downloads/SuperPOS-Client-win-x64.zip SuperPOS/src/SuperPOS.API/wwwroot/downloads/SuperPOS-Mobile.apk SuperPOS/src/SuperPOS.API/wwwroot/downloads/mobile-version.txt SuperPOS/src/SuperPOS.API/wwwroot/downloads/client-version.txt
           git diff --staged --quiet && echo "Sin cambios en los binarios" || git commit -m "chore: actualizar descargas (build automatico) [skip ci]"
           git push origin main
