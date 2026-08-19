@@ -30,6 +30,13 @@ public class MovimientosResult
     public List<MovimientoDto> Items { get; set; } = [];
 }
 
+public class TarjetaInfoDto
+{
+    public string Codigo { get; set; } = "";
+    public string Nombre { get; set; } = "";
+    public bool EsCredito { get; set; }
+}
+
 // Calendario de pagos a proveedores
 public class CalendarioPagoDto
 {

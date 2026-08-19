@@ -1,10 +1,13 @@
 using System;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
+using SuperPOS.Client.Models;
 
 namespace SuperPOS.Client.Views.Caja;
 
@@ -13,6 +16,7 @@ public partial class ProcesandoPagoWindow : Wpf.Ui.Controls.FluentWindow
     private readonly decimal _monto;
     private readonly bool _esCredito;
     private readonly CancellationTokenSource _cts = new();
+    private TarjetaInfoDto? _tarjetaElegida;
 
     public bool TransaccionAprobada { get; private set; }
     public string TarjetaMarca { get; private set; } = "";
@@ -27,13 +31,39 @@ public partial class ProcesandoPagoWindow : Wpf.Ui.Controls.FluentWindow
         _monto = monto;
         _esCredito = esCredito;
 
+        TxtMontoSeleccion.Text = $"Monto: $ {monto:N2}";
         TxtMonto.Text = $"Monto: $ {monto:N2}";
-        TxtEstado.Text = $"Esperando tarjeta de {(esCredito ? "CRÉDITO" : "DÉBITO")} en Ingenico Lane 3000...";
-        
-        Loaded += OnLoaded;
+
+        Loaded += async (_, _) => await CargarTarjetasAsync();
     }
 
-    private async void OnLoaded(object sender, RoutedEventArgs e)
+    private async Task CargarTarjetasAsync()
+    {
+        try
+        {
+            var tarjetas = await App.Api.GetTarjetasSoportadas();
+            IcTarjetas.ItemsSource = tarjetas.Where(t => t.EsCredito == _esCredito).ToList();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"No se pudo obtener la lista de tarjetas:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private async void BtnTarjeta_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn || btn.Tag is not TarjetaInfoDto tarjeta) return;
+
+        _tarjetaElegida = tarjeta;
+        TxtTitulo.Text = $"💳 {tarjeta.Nombre}";
+        PanelSeleccion.Visibility = Visibility.Collapsed;
+        PanelProcesando.Visibility = Visibility.Visible;
+        TxtEstado.Text = $"Esperando tarjeta en el terminal ({tarjeta.Nombre})...";
+
+        await IniciarCobroAsync();
+    }
+
+    private async Task IniciarCobroAsync()
     {
         try
         {
@@ -43,7 +73,9 @@ public partial class ProcesandoPagoWindow : Wpf.Ui.Controls.FluentWindow
             var requestData = new
             {
                 Monto = _monto,
-                EsCredito = _esCredito
+                EsCredito = _esCredito,
+                TarjetaCodigo = _tarjetaElegida?.Codigo,
+                TarjetaNombre = _tarjetaElegida?.Nombre
             };
 
             var response = await client.PostAsJsonAsync("api/pagos-integrados/posnet/iniciar", requestData, _cts.Token);
@@ -54,7 +86,7 @@ public partial class ProcesandoPagoWindow : Wpf.Ui.Controls.FluentWindow
             }
 
             var result = await response.Content.ReadFromJsonAsync<JsonElement>();
-            
+
             bool exito = false;
             if (result.TryGetProperty("exito", out var ex))
             {
@@ -64,14 +96,14 @@ public partial class ProcesandoPagoWindow : Wpf.Ui.Controls.FluentWindow
             if (exito)
             {
                 TransaccionAprobada = true;
-                TarjetaMarca = result.TryGetProperty("tarjetaMarca", out var tm) ? tm.GetString() ?? "VISA" : "VISA";
+                TarjetaMarca = result.TryGetProperty("tarjetaMarca", out var tm) ? tm.GetString() ?? _tarjetaElegida?.Nombre ?? "VISA" : _tarjetaElegida?.Nombre ?? "VISA";
                 TarjetaUltimosDigitos = result.TryGetProperty("tarjetaUltimosDigitos", out var ud) ? ud.GetString() ?? "0000" : "0000";
                 CodigoAutorizacion = result.TryGetProperty("codigoAutorizacion", out var ca) ? ca.GetString() ?? "000000" : "000000";
                 NumeroCupon = result.TryGetProperty("numeroCupon", out var nc) ? nc.GetString() ?? "0000" : "0000";
 
                 TxtEstado.Text = "¡PAGO APROBADO!";
                 Spinner.IsIndeterminate = false;
-                
+
                 await Task.Delay(800); // Dar feedback visual de éxito
                 DialogResult = true;
                 Close();

@@ -353,6 +353,10 @@ public class ApiService
         r.EnsureSuccessStatusCode();
     }
 
+    // === PAGOS INTEGRADOS ===
+    public async Task<List<TarjetaInfoDto>> GetTarjetasSoportadas() =>
+        await _http.GetFromJsonAsync<List<TarjetaInfoDto>>("api/pagos-integrados/tarjetas", _json) ?? [];
+
     // === CONFIGURACIÓN ===
     public async Task<ConfiguracionEmpresa?> GetConfiguracion()
     {

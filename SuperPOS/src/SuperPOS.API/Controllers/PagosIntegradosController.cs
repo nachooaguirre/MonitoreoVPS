@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.IO.Ports;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -27,11 +28,36 @@ public class PagosIntegradosController(SuperPOSDbContext db) : ControllerBase
     {
         public decimal Monto { get; set; }
         public bool EsCredito { get; set; } // true = Crédito, false = Débito
+        public string? TarjetaCodigo { get; set; }
+        public string? TarjetaNombre { get; set; }
     }
+
+    /// <summary>Marcas de tarjeta soportadas, para que la caja las muestre como selector antes de cobrar.</summary>
+    private static readonly (string Codigo, string Nombre, bool EsCredito)[] TarjetasSoportadas =
+    [
+        ("visa-cred", "Visa Crédito", true),
+        ("visa-deb", "Visa Débito", false),
+        ("master-cred", "Mastercard Crédito", true),
+        ("master-deb", "Mastercard Débito", false),
+        ("cabal-cred", "Cabal Crédito", true),
+        ("cabal-deb", "Cabal Débito", false),
+        ("amex", "American Express", true),
+        ("naranja", "Naranja", true),
+        ("nativa", "Nativa", true),
+    ];
+
+    [HttpGet("tarjetas")]
+    public IActionResult GetTarjetas() =>
+        Ok(TarjetasSoportadas.Select(t => new { codigo = t.Codigo, nombre = t.Nombre, esCredito = t.EsCredito }));
 
     public class MpQrRequest
     {
         public decimal Monto { get; set; }
+    }
+
+    public class ConfirmarPosnetRequest
+    {
+        public string? CodigoAutorizacion { get; set; }
     }
 
     [HttpPost("posnet/iniciar")]
@@ -61,14 +87,22 @@ public class PagosIntegradosController(SuperPOSDbContext db) : ControllerBase
                 });
             }
 
+            var marca = !string.IsNullOrWhiteSpace(req.TarjetaNombre)
+                ? req.TarjetaNombre
+                : (req.EsCredito ? "VISA CREDITO" : "VISA DEBITO");
+            var ultimos4 = "4321";
+            var codAut = rand.Next(100000, 999999).ToString();
+            var cupon = rand.Next(1000, 9999).ToString();
             return Ok(new
             {
                 exito = true,
-                tarjetaMarca = req.EsCredito ? "VISA CREDITO" : "VISA DEBITO",
-                tarjetaUltimosDigitos = "4321",
-                codigoAutorizacion = rand.Next(100000, 999999).ToString(),
-                numeroCupon = rand.Next(1000, 9999).ToString(),
-                mensaje = "APROBADA (SIMULADO)"
+                tarjetaMarca = marca,
+                tarjetaUltimosDigitos = ultimos4,
+                codigoAutorizacion = codAut,
+                numeroCupon = cupon,
+                mensaje = "APROBADA (SIMULADO)",
+                voucherComercio = GenerarVoucher(req.Monto, marca, ultimos4, codAut, cupon, "COMERCIO"),
+                voucherCliente = GenerarVoucher(req.Monto, marca, ultimos4, codAut, cupon, "CLIENTE")
             });
         }
 
@@ -108,28 +142,32 @@ public class PagosIntegradosController(SuperPOSDbContext db) : ControllerBase
             // Enviar comando al terminal
             serial.Write(txBuffer, 0, txBuffer.Length);
 
-            // Leer respuesta
-            // En una implementación real se lee secuencialmente hasta ETX + LRC
+            // Leer respuesta hasta encontrar ETX + LRC (o timeout del puerto)
             var rxBuffer = new byte[1024];
             int bytesRead = 0;
-            while (bytesRead < 5) // Leer al menos la cabecera
+            while (bytesRead < 2 || rxBuffer[bytesRead - 2] != 0x03)
             {
                 int r = serial.Read(rxBuffer, bytesRead, rxBuffer.Length - bytesRead);
                 if (r == 0) break;
                 bytesRead += r;
+                if (bytesRead >= rxBuffer.Length) break;
             }
 
             serial.Close();
 
-            // En caso de que falle la lectura real por estar en test, devolvemos simulación amigable
+            // ponytail: el layout de campos (marca, ultimos digitos, cod. autorizacion, cupon) del
+            // frame de respuesta LAPOS/Ingenico varia por firmware y no esta verificado contra un
+            // terminal fisico real. Devolver "aprobado" adivinando esos campos es peor que fallar
+            // honesto: podria entregar mercaderia sin cobro real. Loguear los bytes crudos y pedir
+            // verificacion manual con el manual del proveedor / terminal real antes de habilitar.
+            // Upgrade: parsear codigo de respuesta + campos una vez confirmado el layout exacto.
+            var hex = Convert.ToHexString(rxBuffer, 0, bytesRead);
             return Ok(new
             {
-                exito = true,
-                tarjetaMarca = req.EsCredito ? "VISA CRED" : "VISA DEB",
-                tarjetaUltimosDigitos = "8899",
-                codigoAutorizacion = "003311",
-                numeroCupon = "1245",
-                mensaje = "APROBADA POR INGENICO"
+                exito = false,
+                mensaje = "Terminal físico respondió pero el parseo del protocolo LAPOS no está verificado todavía. " +
+                          "No se confirma el cobro sin poder leer el resultado real.",
+                respuestaCruda = hex
             });
         }
         catch (Exception ex)
@@ -143,6 +181,48 @@ public class PagosIntegradosController(SuperPOSDbContext db) : ControllerBase
             });
         }
     }
+
+    /// <summary>
+    /// Segunda fase del cobro (patrón Ingenico/LAPOS estándar): recién asienta la transacción
+    /// después de imprimir el ticket. Si falla la impresión, llamar a /posnet/anular en vez de esto.
+    /// En modo SIMULADOR no hay estado físico que confirmar; en modo físico queda pendiente hasta
+    /// tener el parseo de protocolo verificado (ver nota en /posnet/iniciar).
+    /// </summary>
+    [HttpPost("posnet/confirmar")]
+    public async Task<IActionResult> ConfirmarPosnet([FromBody] ConfirmarPosnetRequest req)
+    {
+        var cfg = await db.ConfiguracionEmpresa.FirstOrDefaultAsync() ?? new ConfiguracionEmpresa();
+        var puerto = cfg.PostnetPuertoCom ?? "SIMULADOR";
+        if (puerto.Equals("SIMULADOR", StringComparison.OrdinalIgnoreCase))
+            return Ok(new { exito = true, mensaje = "Cobro confirmado (simulado)." });
+
+        return Ok(new { exito = false, mensaje = "Confirmación física pendiente: el parseo del protocolo LAPOS no está verificado (ver /posnet/iniciar)." });
+    }
+
+    [HttpPost("posnet/anular")]
+    public async Task<IActionResult> AnularPosnet([FromBody] ConfirmarPosnetRequest req)
+    {
+        var cfg = await db.ConfiguracionEmpresa.FirstOrDefaultAsync() ?? new ConfiguracionEmpresa();
+        var puerto = cfg.PostnetPuertoCom ?? "SIMULADOR";
+        if (puerto.Equals("SIMULADOR", StringComparison.OrdinalIgnoreCase))
+            return Ok(new { exito = true, mensaje = "Cobro anulado (simulado)." });
+
+        return Ok(new { exito = false, mensaje = "Anulación física pendiente: el parseo del protocolo LAPOS no está verificado (ver /posnet/iniciar)." });
+    }
+
+    private static string GenerarVoucher(decimal monto, string marca, string ultimos4, string codAut, string cupon, string copia) => $"""
+        ------------------------------
+                COMPROBANTE DE PAGO
+                   COPIA {copia}
+        ------------------------------
+        Tarjeta: {marca}
+        Terminación: ************{ultimos4}
+        Importe: $ {monto:N2}
+        Cód. autorización: {codAut}
+        Cupón: {cupon}
+        Fecha: {DateTime.Now:dd/MM/yyyy HH:mm}
+        ------------------------------
+        """;
 
     [HttpPost("mercadopago/qr/crear")]
     public async Task<IActionResult> CrearMpQr([FromBody] MpQrRequest req)
@@ -245,6 +325,41 @@ public class PagosIntegradosController(SuperPOSDbContext db) : ControllerBase
                 aviso = "Excepción en conexión: " + ex.Message
             });
         }
+    }
+
+    /// <summary>
+    /// Notificación push de Mercado Pago (IPN): más confiable que el polling de /mercadopago/estado
+    /// porque MP avisa apenas cambia el estado, en vez de esperar a que la caja pregunte.
+    /// Configurar esta URL como webhook en las notificaciones de la app de Mercado Pago.
+    /// </summary>
+    [AllowAnonymous]
+    [HttpPost("mercadopago/webhook")]
+    public async Task<IActionResult> WebhookMp([FromQuery] string? topic, [FromQuery] string? id)
+    {
+        if (topic != "merchant_order" || string.IsNullOrWhiteSpace(id))
+            return Ok(); // Otros topics (payment, etc.) no los usamos todavía; confirmar 200 igual.
+
+        var cfg = await db.ConfiguracionEmpresa.FirstOrDefaultAsync() ?? new ConfiguracionEmpresa();
+        var token = cfg.MpAccessToken;
+        if (string.IsNullOrWhiteSpace(token)) return Ok();
+
+        try
+        {
+            using var client = new HttpClient();
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            var res = await client.GetAsync($"https://api.mercadopago.com/merchant_orders/{id}");
+            if (!res.IsSuccessStatusCode) return Ok();
+
+            var order = await res.Content.ReadFromJsonAsync<JsonElement>();
+            var referencia = order.TryGetProperty("external_reference", out var er) ? er.GetString() : null;
+            var status = order.TryGetProperty("status", out var st) ? st.GetString()?.ToLowerInvariant() : null;
+
+            if (!string.IsNullOrWhiteSpace(referencia) && (status == "closed" || status == "paid"))
+                _simulatedMpOrders[referencia] = "PAGADO";
+        }
+        catch { /* MP reintenta el webhook si no respondemos 200; no hace falta propagar el error */ }
+
+        return Ok();
     }
 
     [HttpGet("mercadopago/estado/{referencia}")]
