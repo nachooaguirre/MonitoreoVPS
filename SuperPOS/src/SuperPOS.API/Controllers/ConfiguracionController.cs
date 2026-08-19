@@ -46,6 +46,15 @@ public class ConfiguracionController(SuperPOSDbContext db) : ControllerBase
             existing.ControlaStock    = cfg.ControlaStock;
             existing.PrecioConIva     = cfg.PrecioConIva;
             existing.BackupRuta       = cfg.BackupRuta;
+            existing.AfipCertificadoPath     = cfg.AfipCertificadoPath;
+            existing.AfipCertificadoPassword = cfg.AfipCertificadoPassword;
+            existing.PosnetHabilitado   = cfg.PosnetHabilitado;
+            existing.PostnetPuertoCom   = cfg.PostnetPuertoCom;
+            existing.MpQrHabilitado     = cfg.MpQrHabilitado;
+            existing.MpAccessToken      = cfg.MpAccessToken;
+            existing.MpCollectorId      = cfg.MpCollectorId;
+            existing.MpStoreId          = cfg.MpStoreId;
+            existing.MpExternalPosId    = cfg.MpExternalPosId;
         }
         await db.SaveChangesAsync();
         return NoContent();

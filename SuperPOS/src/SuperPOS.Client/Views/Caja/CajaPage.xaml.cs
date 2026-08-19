@@ -330,7 +330,7 @@ public partial class CajaPage : Page
         if (dlg.ShowDialog() == true && dlg.Pagos.Count > 0)
         {
             decimal totalRecibido = dlg.Pagos.Sum(p => p.Importe + p.Vuelto);
-            await ProcesarCobro(dlg.Pagos, totalRecibido);
+            await ProcesarCobro(dlg.Pagos, totalRecibido, dlg.TotalRecargo);
         }
     }
 
@@ -344,10 +344,11 @@ public partial class CajaPage : Page
         var idMedio = CmbMedioPago.SelectedValue is int m ? m : 1;
 
         string? referenciaPago = null;
+        decimal recargo = 0;
         try
         {
             var globalCfg = await App.Api.GetConfiguracion();
-            
+
             // 1. Integración con Postnet (Tarjeta de Débito = 2 o Tarjeta de Crédito = 3)
             if ((idMedio == 2 || idMedio == 3) && globalCfg?.PosnetHabilitado == true)
             {
@@ -357,6 +358,8 @@ public partial class CajaPage : Page
                     return; // Transacción cancelada o fallida por el cajero
                 }
                 referenciaPago = $"{dlg.TarjetaMarca} (*{dlg.TarjetaUltimosDigitos}) Aut:{dlg.CodigoAutorizacion} Cup:{dlg.NumeroCupon}";
+                recargo = dlg.Recargo;
+                if (recargo != 0) referenciaPago += $" | Recargo: $ {recargo:N2}";
                 recibido = total;
             }
             // 2. Integración con Mercado Pago QR (idMedio == 4)
@@ -385,12 +388,12 @@ public partial class CajaPage : Page
             new() { IdMedioPago = idMedio, Importe = Math.Min(recibido, total), Vuelto = Math.Max(0, recibido - total), Referencia = referenciaPago }
         };
 
-        await ProcesarCobro(pagos, recibido);
+        await ProcesarCobro(pagos, recibido, recargo);
     }
 
-    private async Task ProcesarCobro(List<ComprobantePago> pagos, decimal totalRecibido)
+    private async Task ProcesarCobro(List<ComprobantePago> pagos, decimal totalRecibido, decimal recargo = 0)
     {
-        var total = _items.Sum(i => i.SubTotal);
+        var total = _items.Sum(i => i.SubTotal) + recargo;
         var tipoId = CmbTipoComprobante.SelectedValue is int tc ? tc : 7;
         var iva21 = _items.Where(i => i.AlicuotaIva == 21).Sum(i => i.SubTotal - i.Cantidad * i.PrecioUnitario / 1.21m);
         var iva105 = _items.Where(i => i.AlicuotaIva == 10.5m).Sum(i => i.SubTotal - i.Cantidad * i.PrecioUnitario / 1.105m);
@@ -409,6 +412,7 @@ public partial class CajaPage : Page
             TotalIva21 = iva21,
             TotalIva105 = iva105,
             Total = total,
+            Comision = recargo,
             Estado = EstadoComprobante.Emitido,
             Detalles = _items.Select(i => new ComprobanteDetalle
             {

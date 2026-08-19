@@ -32,23 +32,22 @@ public class PagosIntegradosController(SuperPOSDbContext db) : ControllerBase
         public string? TarjetaNombre { get; set; }
     }
 
-    /// <summary>Marcas de tarjeta soportadas, para que la caja las muestre como selector antes de cobrar.</summary>
-    private static readonly (string Codigo, string Nombre, bool EsCredito)[] TarjetasSoportadas =
-    [
-        ("visa-cred", "Visa Crédito", true),
-        ("visa-deb", "Visa Débito", false),
-        ("master-cred", "Mastercard Crédito", true),
-        ("master-deb", "Mastercard Débito", false),
-        ("cabal-cred", "Cabal Crédito", true),
-        ("cabal-deb", "Cabal Débito", false),
-        ("amex", "American Express", true),
-        ("naranja", "Naranja", true),
-        ("nativa", "Nativa", true),
-    ];
-
     [HttpGet("tarjetas")]
-    public IActionResult GetTarjetas() =>
-        Ok(TarjetasSoportadas.Select(t => new { codigo = t.Codigo, nombre = t.Nombre, esCredito = t.EsCredito }));
+    public async Task<IActionResult> GetTarjetas() =>
+        Ok(await db.TarjetasMarca.Where(t => t.Activo).OrderBy(t => t.Nombre).ToListAsync());
+
+    /// <summary>Actualiza el % de recargo/descuento de una marca de tarjeta.</summary>
+    [Authorize(Policy = "AdminOnly")]
+    [HttpPut("tarjetas/{id}")]
+    public async Task<IActionResult> ActualizarTarjeta(int id, [FromBody] TarjetaMarca req)
+    {
+        var t = await db.TarjetasMarca.FindAsync(id);
+        if (t is null) return NotFound();
+        t.PorcentajeRecargo = req.PorcentajeRecargo;
+        t.Activo = req.Activo;
+        await db.SaveChangesAsync();
+        return Ok(t);
+    }
 
     public class MpQrRequest
     {

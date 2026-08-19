@@ -22,3 +22,15 @@ public enum TipoMedioPago
     CtaCte = 7,
     Vale = 8
 }
+
+/// <summary>Marca de tarjeta soportada por el cobro integrado (Posnet), con su recargo/descuento % opcional.</summary>
+public class TarjetaMarca
+{
+    public int Id { get; set; }
+    public string Codigo { get; set; } = string.Empty;
+    public string Nombre { get; set; } = string.Empty;
+    public bool EsCredito { get; set; }
+    /// <summary>% que se suma al monto a cobrar al elegir esta tarjeta. Negativo = descuento.</summary>
+    public decimal PorcentajeRecargo { get; set; }
+    public bool Activo { get; set; } = true;
+}

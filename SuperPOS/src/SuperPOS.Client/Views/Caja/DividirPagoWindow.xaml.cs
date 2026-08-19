@@ -15,6 +15,8 @@ public partial class DividirPagoWindow : Window
     private readonly decimal _totalVenta;
     private readonly ObservableCollection<PagoItem> _pagosAgregados = new();
     public List<ComprobantePago> Pagos { get; } = new();
+    /// <summary>Suma de recargos/descuentos por tarjeta aplicados en este cobro (para sumar al total del comprobante).</summary>
+    public decimal TotalRecargo { get; private set; }
 
     public DividirPagoWindow(decimal totalVenta, List<MedioPago> mediosPago)
     {
@@ -148,6 +150,11 @@ public partial class DividirPagoWindow : Window
                         return;
                     }
                     referencia = $"{dlg.TarjetaMarca} (*{dlg.TarjetaUltimosDigitos}) Aut:{dlg.CodigoAutorizacion} Cup:{dlg.NumeroCupon}";
+                    if (dlg.Recargo != 0)
+                    {
+                        TotalRecargo += dlg.Recargo;
+                        referencia += $" | Recargo: $ {dlg.Recargo:N2}";
+                    }
                 }
             }
             catch (Exception ex)

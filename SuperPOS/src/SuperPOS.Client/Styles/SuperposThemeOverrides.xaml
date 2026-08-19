@@ -100,10 +100,24 @@
         <Setter Property="BorderThickness" Value="0"/>
     </Style>
 
+    <!-- Calendario/DatePicker: Foreground y FontWeight son propiedades heredadas en WPF, así que
+         fijarlas acá cubre TODO el popup (encabezado L M X J V S D, título mes/año, y los días que
+         no tienen trigger propio) sin necesitar re-plantillar cada parte interna del control. -->
+    <Style TargetType="Calendar">
+        <Setter Property="Foreground" Value="#1E1E1E"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Background" Value="White"/>
+    </Style>
+    <Style TargetType="DatePicker">
+        <Setter Property="Foreground" Value="#1E1E1E"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+
     <!-- Estilo para botones de día del calendario (corrige contraste) -->
     <Style TargetType="{x:Type primitives:CalendarDayButton}">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="#1E1E1E"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type primitives:CalendarDayButton}">

@@ -32,9 +32,12 @@ public class MovimientosResult
 
 public class TarjetaInfoDto
 {
+    public int Id { get; set; }
     public string Codigo { get; set; } = "";
     public string Nombre { get; set; } = "";
     public bool EsCredito { get; set; }
+    public decimal PorcentajeRecargo { get; set; }
+    public bool Activo { get; set; }
 }
 
 // Calendario de pagos a proveedores

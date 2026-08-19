@@ -24,6 +24,10 @@ public partial class ProcesandoPagoWindow : Wpf.Ui.Controls.FluentWindow
     public string CodigoAutorizacion { get; private set; } = "";
     public string NumeroCupon { get; private set; } = "";
     public string MensajeError { get; private set; } = "";
+    /// <summary>Recargo/descuento aplicado según la marca elegida (puede ser negativo).</summary>
+    public decimal Recargo { get; private set; }
+    /// <summary>Monto real cobrado en el terminal (monto original + recargo).</summary>
+    public decimal MontoConRecargo { get; private set; }
 
     public ProcesandoPagoWindow(decimal monto, bool esCredito)
     {
@@ -55,9 +59,15 @@ public partial class ProcesandoPagoWindow : Wpf.Ui.Controls.FluentWindow
         if (sender is not Button btn || btn.Tag is not TarjetaInfoDto tarjeta) return;
 
         _tarjetaElegida = tarjeta;
+        Recargo = Math.Round(_monto * tarjeta.PorcentajeRecargo / 100, 2);
+        MontoConRecargo = _monto + Recargo;
+
         TxtTitulo.Text = $"💳 {tarjeta.Nombre}";
         PanelSeleccion.Visibility = Visibility.Collapsed;
         PanelProcesando.Visibility = Visibility.Visible;
+        TxtMonto.Text = Recargo == 0
+            ? $"Monto: $ {_monto:N2}"
+            : $"Monto: $ {MontoConRecargo:N2}  ({(Recargo > 0 ? "+" : "")}{tarjeta.PorcentajeRecargo:N2}% = $ {Recargo:N2})";
         TxtEstado.Text = $"Esperando tarjeta en el terminal ({tarjeta.Nombre})...";
 
         await IniciarCobroAsync();
@@ -72,7 +82,7 @@ public partial class ProcesandoPagoWindow : Wpf.Ui.Controls.FluentWindow
 
             var requestData = new
             {
-                Monto = _monto,
+                Monto = MontoConRecargo,
                 EsCredito = _esCredito,
                 TarjetaCodigo = _tarjetaElegida?.Codigo,
                 TarjetaNombre = _tarjetaElegida?.Nombre
