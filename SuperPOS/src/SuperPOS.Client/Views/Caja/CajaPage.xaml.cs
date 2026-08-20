@@ -198,7 +198,7 @@ public partial class CajaPage : Page
             return;
         }
 
-        var art = await App.Api.BuscarArticuloPorCodigo(codigo);
+        var art = await App.Api.BuscarArticuloPorCodigo(codigo) ?? await App.Cache.BuscarPorCodigoAsync(codigo);
         if (art is null)
         {
             // Si es número y no encontró por código, abrir búsqueda
@@ -427,11 +427,32 @@ public partial class CajaPage : Page
             Pagos = pagos
         };
 
+        var itemsSnapshot = _items.ToList();
+        Comprobante? resultado;
         try
         {
-            var itemsSnapshot = _items.ToList();
-            var resultado = await App.Api.RegistrarVenta(cbte);
+            resultado = await App.Api.RegistrarVenta(cbte);
+        }
+        catch (Exception ex) when (EsErrorDeConexion(ex))
+        {
+            // Sin conexión con el servidor: guardamos la venta local y la sincronizamos sola cuando vuelva internet.
+            await App.Cache.EncolarVentaAsync(cbte);
+            foreach (var det in cbte.Detalles)
+                await App.Cache.AjustarStockAsync(det.IdArticulo, -det.Cantidad);
 
+            MessageBox.Show($"Sin conexión con el servidor: la venta se guardó localmente y se sincronizará sola.\n\nTotal: $ {total:N2}\nVuelto: $ {Math.Max(0, totalRecibido - total):N2}",
+                "Venta guardada offline", MessageBoxButton.OK, MessageBoxImage.Warning);
+            LimpiarVenta();
+            return;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error al registrar la venta:\n{ex.Message}", "Error");
+            return;
+        }
+
+        try
+        {
             // Ejecutar la impresión en segundo plano para no congelar la interfaz de cobro
             _ = Task.Run(async () =>
             {
@@ -470,6 +491,10 @@ public partial class CajaPage : Page
             MessageBox.Show($"Error al registrar la venta:\n{ex.Message}", "Error");
         }
     }
+
+    /// <summary>True si la excepción es por no poder alcanzar el servidor (no un rechazo de negocio).</summary>
+    private static bool EsErrorDeConexion(Exception ex) =>
+        ex is System.Net.Http.HttpRequestException { StatusCode: null } or TaskCanceledException;
 
     private async Task InicializarTeclado()
     {

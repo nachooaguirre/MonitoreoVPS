@@ -33,6 +33,7 @@ fun MenuScreen(
     onNavigateToConfig: () -> Unit,
     onNavigateToEditarProducto: () -> Unit,
     onNavigateToEgresosIngresos: () -> Unit,
+    onNavigateToNuevaOrdenCompra: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -158,6 +159,12 @@ fun MenuScreen(
                 title = "Egresos / Ingresos",
                 desc = "Mover mercadería del depósito a panadería, carnicería, etc.",
                 onClick = onNavigateToEgresosIngresos
+            )
+
+            MenuCard(
+                title = "Nueva Orden de Compra",
+                desc = "Armar un pedido a proveedor como borrador (se confirma desde la PC)",
+                onClick = onNavigateToNuevaOrdenCompra
             )
         }
     }

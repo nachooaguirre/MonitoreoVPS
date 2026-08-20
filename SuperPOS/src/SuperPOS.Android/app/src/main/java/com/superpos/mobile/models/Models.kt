@@ -167,6 +167,22 @@ data class LoginResponse(
     val token: String
 )
 
+data class OrdenCompraCreateRequest(
+    val idProveedor: Int,
+    val idUsuario: Int,
+    val estado: Int = 5, // Borrador: queda pendiente de confirmar desde el cliente WPF
+    val observaciones: String? = null,
+    val detalles: List<OrdenCompraCreateItem>
+)
+
+data class OrdenCompraCreateItem(
+    val idArticulo: Int,
+    val cantidadPedida: Double,
+    val precioCosto: Double,
+    val alicuotaIva: Double,
+    val subtotal: Double
+)
+
 data class LocalOcItem(
     val idArticulo: Int,
     val descripcion: String,

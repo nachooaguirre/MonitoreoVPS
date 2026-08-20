@@ -474,6 +474,51 @@ public class ArticulosController(SuperPOSDbContext db) : ControllerBase
 
         return Ok(new { id = art.Id, stockActual = art.StockActual });
     }
+
+    /// <summary>Stock y mínimos (depósito + góndola) de un artículo, por cada sucursal.</summary>
+    [HttpGet("{id}/stock-sucursales")]
+    public async Task<IActionResult> GetStockSucursales(int id)
+    {
+        var sucursales = await db.Sucursales.AsNoTracking().Where(s => s.Activo).OrderBy(s => s.Id).ToListAsync();
+        var stocks = await db.ArticulosStockPorSucursal.AsNoTracking().Where(x => x.IdArticulo == id).ToListAsync();
+
+        var items = sucursales.Select(s =>
+        {
+            var row = stocks.FirstOrDefault(x => x.IdSucursal == s.Id);
+            return new
+            {
+                s.Id,
+                SucursalNombre = s.Nombre,
+                Cantidad = row?.Cantidad ?? 0,
+                StockMinimo = row?.StockMinimo ?? 0,
+                StockMinimoGondola = row?.StockMinimoGondola ?? 0
+            };
+        });
+        return Ok(items);
+    }
+
+    /// <summary>Fija los mínimos de reposición (depósito y góndola) de un artículo para una sucursal puntual.</summary>
+    [HttpPut("{id}/stock-sucursales/{idSucursal}/minimos")]
+    public async Task<IActionResult> SetStockMinimoSucursal(int id, int idSucursal, [FromBody] StockMinimoSucursalRequest req)
+    {
+        var row = await db.ArticulosStockPorSucursal.FirstOrDefaultAsync(x => x.IdArticulo == id && x.IdSucursal == idSucursal);
+        if (row is null)
+        {
+            row = new ArticuloStockSucursal { IdArticulo = id, IdSucursal = idSucursal };
+            db.ArticulosStockPorSucursal.Add(row);
+        }
+        row.StockMinimo = req.StockMinimo;
+        row.StockMinimoGondola = req.StockMinimoGondola;
+
+        await db.SaveChangesAsync();
+        return Ok(new { row.IdArticulo, row.IdSucursal, row.StockMinimo, row.StockMinimoGondola });
+    }
+}
+
+public class StockMinimoSucursalRequest
+{
+    public decimal StockMinimo { get; set; }
+    public decimal StockMinimoGondola { get; set; }
 }
 
 public class ActualizacionPreciosFiltrosDto

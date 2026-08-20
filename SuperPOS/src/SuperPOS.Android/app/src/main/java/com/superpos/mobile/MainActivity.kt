@@ -106,7 +106,8 @@ class MainActivity : ComponentActivity() {
                                     onNavigateToStock = { navController.navigate("stock") },
                                     onNavigateToConfig = { navController.navigate("config") },
                                     onNavigateToEditarProducto = { navController.navigate("editar_producto") },
-                                    onNavigateToEgresosIngresos = { navController.navigate("egresos_ingresos") }
+                                    onNavigateToEgresosIngresos = { navController.navigate("egresos_ingresos") },
+                                    onNavigateToNuevaOrdenCompra = { navController.navigate("nueva_orden_compra") }
                                 )
                             }
                         }
@@ -170,6 +171,17 @@ class MainActivity : ComponentActivity() {
                                 LaunchedEffect(Unit) { navController.navigate("login") { popUpTo(0) { inclusive = true } } }
                             } else {
                                 EgresosIngresosScreen(
+                                    operatorId = loggedInUser!!.id,
+                                    onNavigateBack = { navController.navigateUp() },
+                                    registerScanCallback = registerCallback
+                                )
+                            }
+                        }
+                        composable("nueva_orden_compra") {
+                            if (loggedInUser == null) {
+                                LaunchedEffect(Unit) { navController.navigate("login") { popUpTo(0) { inclusive = true } } }
+                            } else {
+                                NuevaOrdenCompraScreen(
                                     operatorId = loggedInUser!!.id,
                                     onNavigateBack = { navController.navigateUp() },
                                     registerScanCallback = registerCallback

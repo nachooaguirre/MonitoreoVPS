@@ -16,6 +16,7 @@ using SuperPOS.Client.Views.CtaCte;
 using SuperPOS.Client.Views.Inventario;
 using SuperPOS.Client.Views.OrdenesCompra;
 using SuperPOS.Client.Views.Proveedores;
+using SuperPOS.Client.Views.Sucursales;
 using SuperPOS.Client.Views.Remitos;
 using SuperPOS.Client.Views.Tesoreria;
 using SuperPOS.Client.Views.Reportes;
@@ -211,6 +212,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         BtnContabilidad.IsEnabled  = p.AccesoReportes || p.EsAdministrador;
         BtnConfig.IsEnabled        = p.AccesoConfiguracion || p.EsAdministrador;
         BtnUsuarios.Visibility     = (p.AccesoUsuarios || p.EsAdministrador) ? Visibility.Visible : Visibility.Collapsed;
+        BtnSucursales.Visibility   = p.EsAdministrador ? Visibility.Visible : Visibility.Collapsed;
         BtnAuditoria.Visibility    = p.EsAdministrador ? Visibility.Visible : Visibility.Collapsed;
 
         var verCampana = p.EsAdministrador || p.AccesoStock || p.AccesoCompras || p.AccesoReportes;
@@ -251,6 +253,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
             "ai"            => new AiAsistentePage(),
             "configuracion" => new ConfiguracionPage(),
             "usuarios"      => new UsuariosPage(),
+            "sucursales"    => new SucursalesPage(),
             "auditoria"     => new AuditoriaPage(),
             "logout"        => null,
             _               => new ProximamentePage(destino)

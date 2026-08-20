@@ -40,6 +40,18 @@ public class TarjetaInfoDto
     public bool Activo { get; set; }
 }
 
+// Sucursales / Puntos de Venta
+public class SucursalAdminDto
+{
+    public int Id { get; set; }
+    public string Nombre { get; set; } = "";
+    public bool EsCentral { get; set; }
+    public string? Direccion { get; set; }
+    public bool Activo { get; set; }
+    public int CajasActivas { get; set; }
+    public int CajasInactivas { get; set; }
+}
+
 // Calendario de pagos a proveedores
 public class CalendarioPagoDto
 {

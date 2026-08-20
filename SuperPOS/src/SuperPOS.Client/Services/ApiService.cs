@@ -258,6 +258,39 @@ public class ApiService
         r.EnsureSuccessStatusCode();
     }
 
+    // === SUCURSALES / PUNTOS DE VENTA ===
+    public async Task<List<SucursalAdminDto>> GetSucursales(bool incluirInactivas = true) =>
+        await _http.GetFromJsonAsync<List<SucursalAdminDto>>($"api/sucursales?incluirInactivas={incluirInactivas}", _json) ?? [];
+
+    public async Task<Sucursal?> CrearSucursal(Sucursal s)
+    {
+        var r = await _http.PostAsJsonAsync("api/sucursales", s);
+        r.EnsureSuccessStatusCode();
+        return await r.Content.ReadFromJsonAsync<Sucursal>(_json);
+    }
+
+    public async Task ActualizarSucursal(Sucursal s)
+    {
+        var r = await _http.PutAsJsonAsync($"api/sucursales/{s.Id}", s);
+        r.EnsureSuccessStatusCode();
+    }
+
+    public async Task<List<Caja>> GetCajas(int idSucursal) =>
+        await _http.GetFromJsonAsync<List<Caja>>($"api/cajas?idSucursal={idSucursal}", _json) ?? [];
+
+    public async Task<Caja?> CrearCaja(Caja c)
+    {
+        var r = await _http.PostAsJsonAsync("api/cajas", c);
+        r.EnsureSuccessStatusCode();
+        return await r.Content.ReadFromJsonAsync<Caja>(_json);
+    }
+
+    public async Task ActualizarCaja(Caja c)
+    {
+        var r = await _http.PutAsJsonAsync($"api/cajas/{c.Id}", c);
+        r.EnsureSuccessStatusCode();
+    }
+
     // === VENTAS ===
     public async Task<Comprobante?> RegistrarVenta(Comprobante cbte)
     {

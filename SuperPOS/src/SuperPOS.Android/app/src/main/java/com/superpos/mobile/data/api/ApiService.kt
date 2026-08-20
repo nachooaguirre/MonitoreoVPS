@@ -22,6 +22,12 @@ interface ApiService {
     @GET("articulos/{id}")
     suspend fun getArticleById(@Path("id") id: Int): Response<Article>
 
+    @GET("articulos")
+    suspend fun searchArticles(
+        @Query("buscar") buscar: String,
+        @Query("pageSize") pageSize: Int = 25
+    ): Response<PaginatedResponse<Article>>
+
     @POST("articulos")
     suspend fun createArticle(
         @Body article: ArticleCreateRequest,
@@ -71,6 +77,9 @@ interface ApiService {
 
     @GET("ordenescompra/{id}")
     suspend fun getOrdenCompraDetail(@Path("id") id: Int): Response<OrdenCompra>
+
+    @POST("ordenescompra")
+    suspend fun createOrdenCompra(@Body request: OrdenCompraCreateRequest): Response<OrdenCompra>
 
     @PUT("ordenescompra/{id}/recibir")
     suspend fun receiveOrdenCompra(

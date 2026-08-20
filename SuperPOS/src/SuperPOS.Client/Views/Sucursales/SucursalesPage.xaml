@@ -1,0 +1,73 @@
+<Page x:Class="SuperPOS.Client.Views.Sucursales.SucursalesPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="Sucursales">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <TextBlock Text="Sucursales y Puntos de Venta" FontSize="24" FontWeight="Bold" VerticalAlignment="Center"/>
+            <ui:Button Grid.Column="1" Content="+ Nueva Sucursal" Appearance="Primary" Click="BtnNuevaSucursal_Click"/>
+        </Grid>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1.1*"/>
+                <ColumnDefinition Width="1.4*"/>
+            </Grid.ColumnDefinitions>
+
+            <DataGrid x:Name="DgSucursales" Grid.Column="0" Margin="0,0,10,0" AutoGenerateColumns="False" IsReadOnly="True"
+                      SelectionMode="Single" GridLinesVisibility="Horizontal" CanUserResizeRows="False"
+                      RowHeight="34" FontSize="13" SelectionChanged="DgSucursales_SelectionChanged">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Nombre" Binding="{Binding Nombre}" Width="*"/>
+                    <DataGridTextColumn Header="Central" Binding="{Binding EsCentral}" Width="60"/>
+                    <DataGridTextColumn Header="PV Activos" Binding="{Binding CajasActivas}" Width="80"/>
+                    <DataGridTextColumn Header="PV Inactivos" Binding="{Binding CajasInactivas}" Width="90"/>
+                    <DataGridTextColumn Header="Estado" Binding="{Binding Activo}" Width="70"/>
+                    <DataGridTemplateColumn Header="" Width="40">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Button Content="✏" Width="30" Height="26" Tag="{Binding}" Click="BtnEditarSucursal_Click"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <Grid Grid.Column="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0" Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <TextBlock x:Name="TxtCajasTitulo" Text="Puntos de venta" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center"/>
+                    <ui:Button x:Name="BtnNuevaCaja" Grid.Column="1" Content="+ Nuevo Punto de Venta" IsEnabled="False" Click="BtnNuevaCaja_Click"/>
+                </Grid>
+
+                <DataGrid x:Name="DgCajas" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
+                          SelectionMode="Single" GridLinesVisibility="Horizontal" CanUserResizeRows="False"
+                          RowHeight="34" FontSize="13">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Nombre" Binding="{Binding Nombre}" Width="*"/>
+                        <DataGridTextColumn Header="Estado" Binding="{Binding Activo}" Width="70"/>
+                        <DataGridTemplateColumn Header="" Width="40">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Content="✏" Width="30" Height="26" Tag="{Binding}" Click="BtnEditarCaja_Click"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Grid>
+    </Grid>
+</Page>

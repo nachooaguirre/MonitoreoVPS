@@ -217,6 +217,7 @@
                     <!-- Administración (abajo) -->
                     <StackPanel Grid.Row="2" Margin="0,0,0,10">
                         <Border BorderThickness="0,1,0,0" BorderBrush="#303030" Margin="8,6"/>
+                        <Button x:Name="BtnSucursales"  Content="🏬  Sucursales"        Style="{StaticResource NavBtn}" Tag="sucursales"  Click="NavButton_Click"/>
                         <Button x:Name="BtnUsuarios"    Content="👥  Usuarios"          Style="{StaticResource NavBtn}" Tag="usuarios"    Click="NavButton_Click"/>
                         <Button x:Name="BtnAuditoria"   Content="🛡️  Auditoría"         Style="{StaticResource NavBtn}" Tag="auditoria"   Click="NavButton_Click"/>
                         <Button x:Name="BtnConfig"      Content="⚙️  Configuración"     Style="{StaticResource NavBtn}" Tag="configuracion" Click="NavButton_Click"/>
