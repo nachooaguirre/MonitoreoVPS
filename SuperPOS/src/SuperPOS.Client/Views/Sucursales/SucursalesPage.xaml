@@ -3,6 +3,12 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
       Title="Sucursales">
+    <Page.Resources>
+        <Style x:Key="CellText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+    </Page.Resources>
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -11,7 +17,7 @@
 
         <Grid Grid.Row="0" Margin="0,0,0,12">
             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-            <TextBlock Text="Sucursales y Puntos de Venta" FontSize="24" FontWeight="Bold" VerticalAlignment="Center"/>
+            <TextBlock Text="Sucursales y Puntos de Venta" FontSize="24" FontWeight="Bold" VerticalAlignment="Center" Foreground="White"/>
             <ui:Button Grid.Column="1" Content="+ Nueva Sucursal" Appearance="Primary" Click="BtnNuevaSucursal_Click"/>
         </Grid>
 
@@ -22,21 +28,25 @@
             </Grid.ColumnDefinitions>
 
             <DataGrid x:Name="DgSucursales" Grid.Column="0" Margin="0,0,10,0" AutoGenerateColumns="False" IsReadOnly="True"
+                      Background="#1C1C1C" Foreground="White" RowBackground="#1E1E1E" AlternatingRowBackground="#242424"
                       SelectionMode="Single" GridLinesVisibility="Horizontal" CanUserResizeRows="False"
                       RowHeight="34" FontSize="13" SelectionChanged="DgSucursales_SelectionChanged">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="Nombre" Binding="{Binding Nombre}" Width="*"/>
-                    <DataGridTextColumn Header="Central" Binding="{Binding EsCentral}" Width="60"/>
-                    <DataGridTextColumn Header="PV Activos" Binding="{Binding CajasActivas}" Width="80"/>
-                    <DataGridTextColumn Header="PV Inactivos" Binding="{Binding CajasInactivas}" Width="90"/>
-                    <DataGridTextColumn Header="Estado" Binding="{Binding Activo}" Width="70"/>
-                    <DataGridTemplateColumn Header="" Width="40">
+                    <DataGridTemplateColumn Header="" Width="70">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <Button Content="✏" Width="30" Height="26" Tag="{Binding}" Click="BtnEditarSucursal_Click"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="✏" Width="30" Height="26" Tag="{Binding}" Click="BtnEditarSucursal_Click"/>
+                                    <Button Content="🗑" Width="30" Height="26" Margin="4,0,0,0" Tag="{Binding}" Click="BtnEliminarSucursal_Click"/>
+                                </StackPanel>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="Nombre" Binding="{Binding Nombre}" Width="2*" MinWidth="140" ElementStyle="{StaticResource CellText}"/>
+                    <DataGridTextColumn Header="Central" Binding="{Binding EsCentral}" Width="80" MinWidth="80" ElementStyle="{StaticResource CellText}"/>
+                    <DataGridTextColumn Header="PV Activos" Binding="{Binding CajasActivas}" Width="100" MinWidth="100" ElementStyle="{StaticResource CellText}"/>
+                    <DataGridTextColumn Header="PV Inactivos" Binding="{Binding CajasInactivas}" Width="110" MinWidth="110" ElementStyle="{StaticResource CellText}"/>
+                    <DataGridTextColumn Header="Estado" Binding="{Binding Activo}" Width="80" MinWidth="80" ElementStyle="{StaticResource CellText}"/>
                 </DataGrid.Columns>
             </DataGrid>
 
@@ -48,23 +58,27 @@
 
                 <Grid Grid.Row="0" Margin="0,0,0,8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                    <TextBlock x:Name="TxtCajasTitulo" Text="Puntos de venta" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="TxtCajasTitulo" Text="Puntos de venta" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center" Foreground="White"/>
                     <ui:Button x:Name="BtnNuevaCaja" Grid.Column="1" Content="+ Nuevo Punto de Venta" IsEnabled="False" Click="BtnNuevaCaja_Click"/>
                 </Grid>
 
                 <DataGrid x:Name="DgCajas" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
+                          Background="#1C1C1C" Foreground="White" RowBackground="#1E1E1E" AlternatingRowBackground="#242424"
                           SelectionMode="Single" GridLinesVisibility="Horizontal" CanUserResizeRows="False"
                           RowHeight="34" FontSize="13">
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="Nombre" Binding="{Binding Nombre}" Width="*"/>
-                        <DataGridTextColumn Header="Estado" Binding="{Binding Activo}" Width="70"/>
-                        <DataGridTemplateColumn Header="" Width="40">
+                        <DataGridTemplateColumn Header="" Width="70">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <Button Content="✏" Width="30" Height="26" Tag="{Binding}" Click="BtnEditarCaja_Click"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button Content="✏" Width="30" Height="26" Tag="{Binding}" Click="BtnEditarCaja_Click"/>
+                                        <Button Content="🗑" Width="30" Height="26" Margin="4,0,0,0" Tag="{Binding}" Click="BtnEliminarCaja_Click"/>
+                                    </StackPanel>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
+                        <DataGridTextColumn Header="Nombre" Binding="{Binding Nombre}" Width="*" ElementStyle="{StaticResource CellText}"/>
+                        <DataGridTextColumn Header="Estado" Binding="{Binding Activo}" Width="70" ElementStyle="{StaticResource CellText}"/>
                     </DataGrid.Columns>
                 </DataGrid>
             </Grid>

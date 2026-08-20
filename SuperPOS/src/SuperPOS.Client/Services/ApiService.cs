@@ -259,7 +259,7 @@ public class ApiService
     }
 
     // === SUCURSALES / PUNTOS DE VENTA ===
-    public async Task<List<SucursalAdminDto>> GetSucursales(bool incluirInactivas = true) =>
+    public async Task<List<SucursalAdminDto>> GetSucursalesAdmin(bool incluirInactivas = true) =>
         await _http.GetFromJsonAsync<List<SucursalAdminDto>>($"api/sucursales?incluirInactivas={incluirInactivas}", _json) ?? [];
 
     public async Task<Sucursal?> CrearSucursal(Sucursal s)
@@ -272,6 +272,12 @@ public class ApiService
     public async Task ActualizarSucursal(Sucursal s)
     {
         var r = await _http.PutAsJsonAsync($"api/sucursales/{s.Id}", s);
+        r.EnsureSuccessStatusCode();
+    }
+
+    public async Task EliminarSucursal(int id)
+    {
+        var r = await _http.DeleteAsync($"api/sucursales/{id}");
         r.EnsureSuccessStatusCode();
     }
 
@@ -288,6 +294,12 @@ public class ApiService
     public async Task ActualizarCaja(Caja c)
     {
         var r = await _http.PutAsJsonAsync($"api/cajas/{c.Id}", c);
+        r.EnsureSuccessStatusCode();
+    }
+
+    public async Task EliminarCaja(int id)
+    {
+        var r = await _http.DeleteAsync($"api/cajas/{id}");
         r.EnsureSuccessStatusCode();
     }
 
@@ -367,6 +379,15 @@ public class ApiService
     {
         var req = new { NombreCompleto = nombreCompleto, IdPerfil = idPerfil, Activo = activo, NuevaPassword = nuevaPassword, Email = email, Telefono = tel, AccesoZebra = accesoZebra };
         var r = await _http.PutAsJsonAsync($"api/usuarios/{id}", req);
+        r.EnsureSuccessStatusCode();
+    }
+
+    public async Task<List<SucursalSimpleDto>> GetSucursalesUsuario(int idUsuario) =>
+        await _http.GetFromJsonAsync<List<SucursalSimpleDto>>($"api/usuarios/{idUsuario}/sucursales", _json) ?? [];
+
+    public async Task SetSucursalesUsuario(int idUsuario, IEnumerable<int> idsSucursales)
+    {
+        var r = await _http.PutAsJsonAsync($"api/usuarios/{idUsuario}/sucursales", idsSucursales.ToArray());
         r.EnsureSuccessStatusCode();
     }
 

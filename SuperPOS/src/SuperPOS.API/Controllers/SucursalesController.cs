@@ -54,4 +54,27 @@ public class SucursalesController(SuperPOSDbContext db) : ControllerBase
         await db.SaveChangesAsync();
         return Ok(s);
     }
+
+    /// <summary>Borra la sucursal. Si tiene datos vinculados (cajas, stock, ventas) no se puede borrar
+    /// de verdad por las foreign keys, así que en ese caso queda desactivada en su lugar.</summary>
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(int id)
+    {
+        var s = await db.Sucursales.FindAsync(id);
+        if (s is null) return NotFound();
+
+        try
+        {
+            db.Sucursales.Remove(s);
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            db.Entry(s).State = EntityState.Unchanged;
+            s.Activo = false;
+            await db.SaveChangesAsync();
+        }
+
+        return NoContent();
+    }
 }

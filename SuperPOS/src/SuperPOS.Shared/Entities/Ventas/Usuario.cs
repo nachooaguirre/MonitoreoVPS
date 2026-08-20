@@ -16,6 +16,14 @@ public class Usuario
     public Perfil? Perfil { get; set; }
 }
 
+/// <summary>Vínculo N a N: un usuario puede pertenecer a más de una sucursal.</summary>
+public class UsuarioSucursal
+{
+    public int Id { get; set; }
+    public int IdUsuario { get; set; }
+    public int IdSucursal { get; set; }
+}
+
 public class Perfil
 {
     public int Id { get; set; }

@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         Title="Usuario"
-        Width="520" Height="440"
+        Width="520" Height="560"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         ExtendsContentIntoTitleBar="True">
@@ -56,6 +56,19 @@
                 <CheckBox x:Name="ChkActivo" Content="Usuario activo" IsChecked="True" Margin="0,0,24,0"/>
                 <CheckBox x:Name="ChkAccesoZebra" Content="Acceso a Colectoras Zebra" IsChecked="False"/>
             </StackPanel>
+
+            <TextBlock Text="Sucursales asignadas (puede ser más de una)" Margin="0,16,0,4"/>
+            <Border BorderBrush="#3A3A3A" BorderThickness="1" CornerRadius="4" Height="100">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ItemsControl x:Name="IcSucursales" Margin="8">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox Content="{Binding Nombre}" IsChecked="{Binding Seleccionada}" Margin="0,3"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Border>
         </StackPanel>
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="20,12">
             <Button Content="Cancelar" Width="100" Height="36" Margin="0,0,8,0" Click="BtnCancelar_Click"/>

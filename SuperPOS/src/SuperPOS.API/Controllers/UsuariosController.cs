@@ -122,6 +122,27 @@ public class UsuariosController(SuperPOSDbContext db, IConfiguration config) : C
         return NoContent();
     }
 
+    /// <summary>Sucursales a las que pertenece el usuario (puede ser más de una).</summary>
+    [HttpGet("{id}/sucursales")]
+    public async Task<IActionResult> GetSucursalesUsuario(int id) =>
+        Ok(await db.UsuariosSucursales.Where(x => x.IdUsuario == id)
+            .Join(db.Sucursales, us => us.IdSucursal, s => s.Id, (us, s) => new { s.Id, s.Nombre })
+            .OrderBy(s => s.Nombre)
+            .ToListAsync());
+
+    /// <summary>Reemplaza el conjunto completo de sucursales asignadas al usuario.</summary>
+    [HttpPut("{id}/sucursales")]
+    public async Task<IActionResult> SetSucursalesUsuario(int id, [FromBody] int[] idsSucursales)
+    {
+        var actuales = await db.UsuariosSucursales.Where(x => x.IdUsuario == id).ToListAsync();
+        db.UsuariosSucursales.RemoveRange(actuales);
+        foreach (var idSuc in idsSucursales.Distinct())
+            db.UsuariosSucursales.Add(new UsuarioSucursal { IdUsuario = id, IdSucursal = idSuc });
+
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
     // Perfiles
     [HttpGet("/api/perfiles")]
     public async Task<IActionResult> GetPerfiles() =>

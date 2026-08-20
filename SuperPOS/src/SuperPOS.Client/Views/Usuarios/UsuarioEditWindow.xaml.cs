@@ -8,6 +8,7 @@ namespace SuperPOS.Client.Views.Usuarios;
 public partial class UsuarioEditWindow : Wpf.Ui.Controls.FluentWindow
 {
     private readonly Usuario? _original;
+    private readonly List<SucursalCheckItem> _sucursales = [];
 
     public UsuarioEditWindow(Usuario? usuario)
     {
@@ -36,6 +37,15 @@ public partial class UsuarioEditWindow : Wpf.Ui.Controls.FluentWindow
             CmbPerfil.SelectedValue = _original.IdPerfil;
         else
             CmbPerfil.SelectedIndex = 0;
+
+        var todas = await App.Api.GetSucursalesAdmin(incluirInactivas: false);
+        var asignadas = _original is null
+            ? []
+            : (await App.Api.GetSucursalesUsuario(_original.Id)).Select(s => s.Id).ToHashSet();
+
+        _sucursales.Clear();
+        _sucursales.AddRange(todas.Select(s => new SucursalCheckItem(s.Id, s.Nombre) { Seleccionada = asignadas.Contains(s.Id) }));
+        IcSucursales.ItemsSource = _sucursales;
     }
 
     private async void BtnGuardar_Click(object sender, RoutedEventArgs e)
@@ -57,18 +67,20 @@ public partial class UsuarioEditWindow : Wpf.Ui.Controls.FluentWindow
 
         try
         {
+            int idUsuario;
             if (_original is null)
             {
                 if (string.IsNullOrWhiteSpace(TxtNombreUsuario.Text))
                 { MessageBox.Show("El nombre de usuario es obligatorio."); return; }
 
-                await App.Api.CrearUsuario(
+                var creado = await App.Api.CrearUsuario(
                     TxtNombreUsuario.Text.Trim(),
                     TxtNombreCompleto.Text.Trim(),
                     pass, idPerfil,
                     TxtEmail.Text.Trim().NullIfEmpty(),
                     TxtTelefono.Text.Trim().NullIfEmpty(),
                     ChkAccesoZebra.IsChecked == true);
+                idUsuario = creado!.Id;
             }
             else
             {
@@ -81,7 +93,11 @@ public partial class UsuarioEditWindow : Wpf.Ui.Controls.FluentWindow
                     TxtEmail.Text.Trim().NullIfEmpty(),
                     TxtTelefono.Text.Trim().NullIfEmpty(),
                     ChkAccesoZebra.IsChecked == true);
+                idUsuario = _original.Id;
             }
+
+            await App.Api.SetSucursalesUsuario(idUsuario, _sucursales.Where(s => s.Seleccionada).Select(s => s.Id));
+
             DialogResult = true;
             Close();
         }
@@ -93,4 +109,11 @@ public partial class UsuarioEditWindow : Wpf.Ui.Controls.FluentWindow
     }
 
     private void BtnCancelar_Click(object sender, RoutedEventArgs e) { DialogResult = false; Close(); }
+
+    private class SucursalCheckItem(int id, string nombre)
+    {
+        public int Id { get; } = id;
+        public string Nombre { get; } = nombre;
+        public bool Seleccionada { get; set; }
+    }
 }

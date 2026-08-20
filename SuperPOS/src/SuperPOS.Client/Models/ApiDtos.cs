@@ -52,6 +52,12 @@ public class SucursalAdminDto
     public int CajasInactivas { get; set; }
 }
 
+public class SucursalSimpleDto
+{
+    public int Id { get; set; }
+    public string Nombre { get; set; } = "";
+}
+
 public class CajaDisponibleDto
 {
     public int Id { get; set; }

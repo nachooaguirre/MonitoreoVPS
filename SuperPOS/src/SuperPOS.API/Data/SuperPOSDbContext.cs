@@ -28,6 +28,7 @@ public class SuperPOSDbContext(DbContextOptions<SuperPOSDbContext> options, IHtt
     public DbSet<TurnoCaja> TurnosCaja => Set<TurnoCaja>();
     public DbSet<Usuario> Usuarios => Set<Usuario>();
     public DbSet<Perfil> Perfiles => Set<Perfil>();
+    public DbSet<UsuarioSucursal> UsuariosSucursales => Set<UsuarioSucursal>();
     public DbSet<Compra> Compras => Set<Compra>();
     public DbSet<CompraDetalle> ComprasDetalle => Set<CompraDetalle>();
     public DbSet<MovimientoCtaCte> MovimientosCtaCte => Set<MovimientoCtaCte>();
@@ -357,6 +358,11 @@ public class SuperPOSDbContext(DbContextOptions<SuperPOSDbContext> options, IHtt
             e.Property(x => x.SaldoInicial).HasColumnType("decimal(18,2)");
             e.Property(x => x.SaldoFinal).HasColumnType("decimal(18,2)");
             e.HasOne(x => x.Caja).WithMany().HasForeignKey(x => x.IdCaja).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        m.Entity<UsuarioSucursal>(e =>
+        {
+            e.HasIndex(x => new { x.IdUsuario, x.IdSucursal }).IsUnique();
         });
 
         m.Entity<Caja>(e =>

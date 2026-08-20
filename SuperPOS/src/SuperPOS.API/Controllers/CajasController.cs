@@ -44,6 +44,29 @@ public class CajasController(SuperPOSDbContext db) : ControllerBase
         return Ok(caja);
     }
 
+    /// <summary>Borra el punto de venta. Si ya tiene ventas/turnos vinculados no se puede borrar
+    /// de verdad por las foreign keys, así que en ese caso queda desactivado en su lugar.</summary>
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(int id)
+    {
+        var caja = await db.Cajas.FindAsync(id);
+        if (caja is null) return NotFound();
+
+        try
+        {
+            db.Cajas.Remove(caja);
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            db.Entry(caja).State = EntityState.Unchanged;
+            caja.Activo = false;
+            await db.SaveChangesAsync();
+        }
+
+        return NoContent();
+    }
+
     /// <summary>Cajas activas de sucursales activas, para el selector de "qué punto de venta abro" al loguearse.</summary>
     [HttpGet("disponibles")]
     public async Task<IActionResult> GetDisponibles()
