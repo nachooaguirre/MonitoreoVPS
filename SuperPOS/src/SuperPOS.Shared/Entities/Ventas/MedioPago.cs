@@ -20,7 +20,10 @@ public enum TipoMedioPago
     MercadoPago = 5,
     Transferencia = 6,
     CtaCte = 7,
-    Vale = 8
+    Vale = 8,
+    Giro = 9,
+    Ticket = 10,
+    Otros = 11
 }
 
 /// <summary>Marca de tarjeta soportada por el cobro integrado (Posnet), con su recargo/descuento % opcional.</summary>

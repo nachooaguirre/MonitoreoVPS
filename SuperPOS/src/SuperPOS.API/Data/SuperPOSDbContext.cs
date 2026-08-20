@@ -1212,7 +1212,10 @@ public class SuperPOSDbContext(DbContextOptions<SuperPOSDbContext> options, IHtt
             new MedioPago { Id = 4, Nombre = "MercadoPago", Tipo = TipoMedioPago.MercadoPago, RequiereReferencia = true, Activo = true },
             new MedioPago { Id = 5, Nombre = "Transferencia", Tipo = TipoMedioPago.Transferencia, RequiereReferencia = true, Activo = true },
             new MedioPago { Id = 6, Nombre = "Cuenta Corriente", Tipo = TipoMedioPago.CtaCte, Activo = true },
-            new MedioPago { Id = 7, Nombre = "Cheque", Tipo = TipoMedioPago.Cheque, RequiereReferencia = true, Activo = true }
+            new MedioPago { Id = 7, Nombre = "Cheque", Tipo = TipoMedioPago.Cheque, RequiereReferencia = true, Activo = true },
+            new MedioPago { Id = 8, Nombre = "Giro", Tipo = TipoMedioPago.Giro, RequiereReferencia = true, Activo = true },
+            new MedioPago { Id = 9, Nombre = "Ticket", Tipo = TipoMedioPago.Ticket, RequiereReferencia = true, Activo = true },
+            new MedioPago { Id = 10, Nombre = "Otros", Tipo = TipoMedioPago.Otros, Activo = true }
         );
 
         m.Entity<TarjetaMarca>(e =>
@@ -1228,7 +1231,10 @@ public class SuperPOSDbContext(DbContextOptions<SuperPOSDbContext> options, IHtt
             new TarjetaMarca { Id = 6, Codigo = "cabal-deb", Nombre = "Cabal Débito", EsCredito = false, Activo = true },
             new TarjetaMarca { Id = 7, Codigo = "amex", Nombre = "American Express", EsCredito = true, Activo = true },
             new TarjetaMarca { Id = 8, Codigo = "naranja", Nombre = "Naranja", EsCredito = true, Activo = true },
-            new TarjetaMarca { Id = 9, Codigo = "nativa", Nombre = "Nativa", EsCredito = true, Activo = true }
+            new TarjetaMarca { Id = 9, Codigo = "nativa", Nombre = "Nativa", EsCredito = true, Activo = true },
+            new TarjetaMarca { Id = 10, Codigo = "maestro", Nombre = "Maestro", EsCredito = false, Activo = true },
+            new TarjetaMarca { Id = 11, Codigo = "otra-cred", Nombre = "Otra (Crédito)", EsCredito = true, Activo = true },
+            new TarjetaMarca { Id = 12, Codigo = "otra-deb", Nombre = "Otra (Débito)", EsCredito = false, Activo = true }
         );
 
         m.Entity<Departamento>().HasData(new Departamento { Id = 1, Nombre = "General", Activo = true });
