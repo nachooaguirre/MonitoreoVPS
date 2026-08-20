@@ -1,14 +1,16 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using SuperPOS.API.Data;
 using SuperPOS.API.Helpers;
+using SuperPOS.API.Hubs;
 using SuperPOS.Shared.Entities.Ventas;
 
 namespace SuperPOS.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class ArticulosController(SuperPOSDbContext db) : ControllerBase
+public class ArticulosController(SuperPOSDbContext db, IHubContext<PosHub> hub) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetAll(
@@ -234,6 +236,11 @@ public class ArticulosController(SuperPOSDbContext db) : ControllerBase
             db.HistorialPrecios.AddRange(logs);
             await db.SaveChangesAsync();
         }
+
+        // Avisa a las terminales (vía SignalR) que este artículo cambió, para que la que tenga
+        // conectada la balanza Kretz en su red local le transmita el nuevo precio/PLU.
+        if (logs.Any(l => l.Campo == "V"))
+            await hub.Clients.All.SendAsync("ArticuloActualizado", articulo.Id);
 
         return NoContent();
     }

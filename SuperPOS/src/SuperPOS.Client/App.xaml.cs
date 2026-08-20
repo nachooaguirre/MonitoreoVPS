@@ -14,6 +14,8 @@ public partial class App : Application
     public static string NombreEmpresa { get; set; } = "Los Angeles Supermercados";
     public static ApiService Api { get; private set; } = null!;
     public static LocalCacheService Cache { get; } = new();
+    /// <summary>Solo tiene efecto si esta PC configuró una balanza Kretz en su red local (appsettings.json).</summary>
+    public static KretzBalanzaService Balanza { get; private set; } = new(null);
     public static string UsuarioNombre { get; set; } = "";
     // Retrocompatibilidad con código viejo que usa UsuarioActual como string
     public static string UsuarioActual { get => UsuarioNombre; set => UsuarioNombre = value; }
@@ -107,6 +109,11 @@ public partial class App : Application
                 var ne = n.GetString();
                 if (!string.IsNullOrWhiteSpace(ne))
                     NombreEmpresa = ne;
+            }
+            if (root.TryGetProperty("BalanzaIp", out var bip) && bip.ValueKind == JsonValueKind.String)
+            {
+                var puerto = root.TryGetProperty("BalanzaPuerto", out var bp) && bp.TryGetInt32(out var p) ? p : 1001;
+                Balanza = new KretzBalanzaService(bip.GetString(), puerto);
             }
         }
         catch

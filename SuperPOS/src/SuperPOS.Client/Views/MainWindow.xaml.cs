@@ -83,6 +83,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
                 Dispatcher.InvokeAsync(RefrescarAlertasStock));
             _posHub.On<int, string, decimal>("StockBajo", (_, _, _) =>
                 Dispatcher.InvokeAsync(RefrescarAlertasStock));
+            _posHub.On<int>("ArticuloActualizado", async idArticulo => await SincronizarBalanzaAsync(idArticulo));
 
             await _posHub.StartAsync();
         }
@@ -94,6 +95,21 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
 
     /// <summary>Llama desde otras ventanas (p. ej. al guardar artículo) para actualizar la campana.</summary>
     public void RefrescarAlertasStock() => _ = ConsultarAlertasStockAsync();
+
+    /// <summary>Si esta PC tiene configurada una balanza Kretz en su red local, le transmite el precio actualizado.</summary>
+    private static async Task SincronizarBalanzaAsync(int idArticulo)
+    {
+        if (!App.Balanza.Configurada) return;
+        try
+        {
+            var art = await App.Api.GetArticulo(idArticulo);
+            if (art != null) await App.Balanza.EnviarPrecioAsync(art);
+        }
+        catch
+        {
+            // ponytail: balanza apagada/desconectada, se reintenta con el próximo cambio de precio
+        }
+    }
 
     private async Task ConsultarAlertasStockAsync()
     {
