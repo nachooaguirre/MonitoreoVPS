@@ -12,15 +12,18 @@ namespace SuperPOS.API.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.InsertData(
-                table: "MediosPago",
-                columns: new[] { "Id", "Activo", "CodigoAfip", "Nombre", "RequiereReferencia", "Tipo" },
-                values: new object[,]
-                {
-                    { 8, true, null, "Giro", true, 9 },
-                    { 9, true, null, "Ticket", true, 10 },
-                    { 10, true, null, "Otros", false, 11 }
-                });
+            // Insert condicional: una base restaurada desde un backup real de producción puede
+            // ya tener filas con estos mismos Id en MediosPago (numeración heredada del sistema
+            // legacy) — un InsertData con Id fijo chocaría contra la primary key y abortaría el
+            // arranque de la API (Migrate() falla => contenedor en restart loop).
+            migrationBuilder.Sql("""
+                INSERT INTO "MediosPago" ("Id", "Activo", "CodigoAfip", "Nombre", "RequiereReferencia", "Tipo")
+                VALUES
+                    (8, true, null, 'Giro', true, 9),
+                    (9, true, null, 'Ticket', true, 10),
+                    (10, true, null, 'Otros', false, 11)
+                ON CONFLICT ("Id") DO NOTHING;
+                """);
 
             migrationBuilder.InsertData(
                 table: "TarjetasMarca",
