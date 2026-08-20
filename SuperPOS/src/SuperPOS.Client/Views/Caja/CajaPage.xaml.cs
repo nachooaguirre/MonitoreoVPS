@@ -405,8 +405,8 @@ public partial class CajaPage : Page
             Letra = 'B',
             PuntoVenta = 1,
             IdCliente = _clienteActual!.Id,
-            IdCaja = 1,
-            IdSucursal = 1,
+            IdCaja = App.CajaId,
+            IdSucursal = App.SucursalId,
             IdUsuario = App.IdUsuarioActual,
             SubTotal = subtotal,
             TotalIva21 = iva21,
@@ -500,7 +500,7 @@ public partial class CajaPage : Page
     {
         try
         {
-            _cajaConfig = await App.Api.GetCajaConfig(1); // Caja 1 por defecto
+            _cajaConfig = await App.Api.GetCajaConfig(App.CajaId);
             var panelId = _cajaConfig?.PanelPrincipal ?? 1;
             await CargarKeypad(panelId);
         }

@@ -52,6 +52,25 @@ public class SucursalAdminDto
     public int CajasInactivas { get; set; }
 }
 
+public class CajaDisponibleDto
+{
+    public int Id { get; set; }
+    public string Nombre { get; set; } = "";
+    public int IdSucursal { get; set; }
+    public string SucursalNombre { get; set; } = "";
+}
+
+public class CajaEstadoDto
+{
+    public int Id { get; set; }
+    public string Nombre { get; set; } = "";
+    public bool Activo { get; set; }
+    public int IdSucursal { get; set; }
+    public string? SucursalNombre { get; set; }
+    public DateTime? UltimaVenta { get; set; }
+    public bool EnLinea { get; set; }
+}
+
 // Calendario de pagos a proveedores
 public class CalendarioPagoDto
 {

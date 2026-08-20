@@ -1,0 +1,35 @@
+<Page x:Class="SuperPOS.Client.Views.Sucursales.TerminalesPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="Terminales">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <TextBlock Text="Terminales" FontSize="24" FontWeight="Bold" VerticalAlignment="Center"/>
+            <ui:Button Grid.Column="1" Content="Actualizar" Click="BtnActualizar_Click"/>
+        </Grid>
+
+        <DataGrid x:Name="DgTerminales" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
+                  GridLinesVisibility="Horizontal" CanUserResizeRows="False" RowHeight="36" FontSize="13">
+            <DataGrid.Columns>
+                <DataGridTemplateColumn Header="Estado" Width="90">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding EstadoTexto}" Foreground="{Binding EstadoColor}" FontWeight="Bold" VerticalAlignment="Center"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn Header="Punto de Venta" Binding="{Binding Nombre}" Width="*"/>
+                <DataGridTextColumn Header="Sucursal" Binding="{Binding SucursalNombre}" Width="*"/>
+                <DataGridTextColumn Header="Activo" Binding="{Binding Activo}" Width="70"/>
+                <DataGridTextColumn Header="Última venta" Binding="{Binding UltimaVentaTexto}" Width="170"/>
+            </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+</Page>

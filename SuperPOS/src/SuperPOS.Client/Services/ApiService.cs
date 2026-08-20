@@ -291,6 +291,12 @@ public class ApiService
         r.EnsureSuccessStatusCode();
     }
 
+    public async Task<List<CajaDisponibleDto>> GetCajasDisponibles() =>
+        await _http.GetFromJsonAsync<List<CajaDisponibleDto>>("api/cajas/disponibles", _json) ?? [];
+
+    public async Task<List<CajaEstadoDto>> GetEstadoTerminales() =>
+        await _http.GetFromJsonAsync<List<CajaEstadoDto>>("api/cajas/estado", _json) ?? [];
+
     // === VENTAS ===
     public async Task<Comprobante?> RegistrarVenta(Comprobante cbte)
     {

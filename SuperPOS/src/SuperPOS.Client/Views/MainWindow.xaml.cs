@@ -213,6 +213,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         BtnConfig.IsEnabled        = p.AccesoConfiguracion || p.EsAdministrador;
         BtnUsuarios.Visibility     = (p.AccesoUsuarios || p.EsAdministrador) ? Visibility.Visible : Visibility.Collapsed;
         BtnSucursales.Visibility   = p.EsAdministrador ? Visibility.Visible : Visibility.Collapsed;
+        BtnTerminales.Visibility   = p.EsAdministrador ? Visibility.Visible : Visibility.Collapsed;
         BtnAuditoria.Visibility    = p.EsAdministrador ? Visibility.Visible : Visibility.Collapsed;
 
         var verCampana = p.EsAdministrador || p.AccesoStock || p.AccesoCompras || p.AccesoReportes;
@@ -254,6 +255,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
             "configuracion" => new ConfiguracionPage(),
             "usuarios"      => new UsuariosPage(),
             "sucursales"    => new SucursalesPage(),
+            "terminales"    => new TerminalesPage(),
             "auditoria"     => new AuditoriaPage(),
             "logout"        => null,
             _               => new ProximamentePage(destino)

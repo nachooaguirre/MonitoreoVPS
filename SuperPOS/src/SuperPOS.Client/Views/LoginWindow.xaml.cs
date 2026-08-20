@@ -79,6 +79,8 @@ public partial class LoginWindow : FluentWindow
             App.IdUsuarioActual = user.Id;
             App.PerfilActual = user.Perfil;
 
+            if (!await ElegirPuntoVentaAsync()) { BtnIngresar.IsEnabled = true; return; }
+
             new MainWindow(App.UsuarioActual).Show();
             Close();
         }
@@ -87,6 +89,37 @@ public partial class LoginWindow : FluentWindow
             MostrarError($"No se pudo conectar al servidor.\nVerificá que la API esté corriendo.\n({ex.Message})");
         }
         finally { BtnIngresar.IsEnabled = true; }
+    }
+
+    /// <summary>
+    /// Fija App.CajaId/App.SucursalId para la sesión. Si hay una sola terminal disponible la asigna
+    /// directo sin preguntar; si hay varias, pide elegir. Devuelve false si el usuario canceló.
+    /// </summary>
+    private async Task<bool> ElegirPuntoVentaAsync()
+    {
+        try
+        {
+            var cajas = await App.Api.GetCajasDisponibles();
+            if (cajas.Count == 0) return true; // sin PV configurados aún: seguir con los valores por defecto
+
+            if (cajas.Count == 1)
+            {
+                App.CajaId = cajas[0].Id;
+                App.SucursalId = cajas[0].IdSucursal;
+                return true;
+            }
+
+            var dlg = new Views.Sucursales.SeleccionarPuntoVentaWindow(cajas) { Owner = this };
+            if (dlg.ShowDialog() != true) return false;
+
+            App.CajaId = dlg.IdCajaElegida;
+            App.SucursalId = dlg.IdSucursalElegida;
+            return true;
+        }
+        catch
+        {
+            return true; // si falla la consulta, seguir con los valores por defecto en vez de trabar el login
+        }
     }
 
     private void MostrarError(string msg)
