@@ -51,13 +51,20 @@ public class ReportesController(SuperPOSDbContext db) : ControllerBase
 
     [HttpGet("ventas-periodo")]
     public async Task<IActionResult> VentasPeriodo([FromQuery] DateTime desde, [FromQuery] DateTime hasta,
-        [FromQuery] string? agrupar = "dia")
+        [FromQuery] string? agrupar = "dia", [FromQuery] int? idSucursal = null)
     {
         var desdeUtc = DateTime.SpecifyKind(desde.ToUtc().Date, DateTimeKind.Utc);
         var hastaUtc = DateTime.SpecifyKind(hasta.ToUtc().Date.AddDays(1), DateTimeKind.Utc);
 
-        var comprobantes = await db.Comprobantes
-            .Where(c => c.Fecha >= desdeUtc && c.Fecha < hastaUtc && c.Estado != EstadoComprobante.Anulado)
+        var permitidas = await SucursalScopeHelper.ObtenerPermitidasAsync(User, db);
+        if (idSucursal.HasValue && permitidas != null && !permitidas.Contains(idSucursal.Value))
+            return Forbid();
+
+        var cq = db.Comprobantes.Where(c => c.Fecha >= desdeUtc && c.Fecha < hastaUtc && c.Estado != EstadoComprobante.Anulado);
+        if (idSucursal.HasValue) cq = cq.Where(c => c.IdSucursal == idSucursal.Value);
+        else if (permitidas != null) cq = cq.Where(c => permitidas.Contains(c.IdSucursal));
+
+        var comprobantes = await cq
             .Select(c => new { c.Fecha, c.Total, IvaTotal = c.TotalIva21 + c.TotalIva105 })
             .ToListAsync();
 
@@ -102,16 +109,22 @@ public class ReportesController(SuperPOSDbContext db) : ControllerBase
 
     [HttpGet("ranking-productos")]
     public async Task<IActionResult> RankingProductos([FromQuery] DateTime? desde, [FromQuery] DateTime? hasta,
-        [FromQuery] int top = 20)
+        [FromQuery] int top = 20, [FromQuery] int? idSucursal = null)
     {
         var desdeUtc = DateTime.SpecifyKind((desde?.ToUtc() ?? DateTime.UtcNow.AddDays(-30)).Date, DateTimeKind.Utc);
         var hastaUtc = DateTime.SpecifyKind((hasta?.ToUtc() ?? DateTime.UtcNow).Date.AddDays(1), DateTimeKind.Utc);
+
+        var permitidas = await SucursalScopeHelper.ObtenerPermitidasAsync(User, db);
+        if (idSucursal.HasValue && permitidas != null && !permitidas.Contains(idSucursal.Value))
+            return Forbid();
 
         var ranking = await db.ComprobantesDetalle
             .Include(d => d.Comprobante)
             .Include(d => d.Articulo)
             .Where(d => d.Comprobante!.Fecha >= desdeUtc && d.Comprobante!.Fecha < hastaUtc
-                     && d.Comprobante!.Estado != EstadoComprobante.Anulado)
+                     && d.Comprobante!.Estado != EstadoComprobante.Anulado
+                     && (idSucursal == null || d.Comprobante!.IdSucursal == idSucursal.Value)
+                     && (permitidas == null || permitidas.Contains(d.Comprobante!.IdSucursal)))
             .GroupBy(d => new { d.IdArticulo, d.Articulo!.Descripcion })
             .Select(g => new
             {

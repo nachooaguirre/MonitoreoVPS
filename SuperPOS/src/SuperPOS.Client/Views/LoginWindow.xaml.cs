@@ -81,6 +81,8 @@ public partial class LoginWindow : FluentWindow
 
             if (!await ElegirPuntoVentaAsync()) { BtnIngresar.IsEnabled = true; return; }
 
+            App.IniciarSincronizacionSiCorresponde();
+
             new MainWindow(App.UsuarioActual).Show();
             Close();
         }

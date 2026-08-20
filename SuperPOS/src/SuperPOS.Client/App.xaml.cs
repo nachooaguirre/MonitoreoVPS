@@ -24,6 +24,7 @@ public partial class App : Application
     public static Perfil PerfilActual { get; set; } = new() { EsAdministrador = true, AccesoCaja = true };
 
     private static System.Threading.Timer? _syncTimer;
+    private static int _syncTicks;
 
     public App()
     {
@@ -32,17 +33,24 @@ public partial class App : Application
         DispatcherUnhandledException += OnDispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
 
-        _ = IniciarCacheYSincronizacionAsync();
+        _ = Cache.InicializarAsync(); // solo crea el archivo/tablas locales, no toca la red
     }
 
     /// <summary>
-    /// Al arrancar, y cada 3 minutos, refresca la caché local de precios/stock (para poder
-    /// seguir vendiendo si se corta internet) y drena la cola de ventas offline pendientes.
+    /// Arranca la sincronización offline recién después de loguearse (no en el arranque de la
+    /// app, para no pegarle al servidor desde la pantalla de login) y solo si este perfil puede
+    /// vender — un puesto de back-office que nunca abre Caja no necesita el catálogo cacheado.
+    /// Con 30+ terminales en simultáneo, un jitter inicial evita que todas golpeen el server
+    /// al mismo segundo; el drenado de ventas pendientes es liviano y corre cada 3 min, pero el
+    /// refresco completo del catálogo (pesado, hasta 20k artículos) es cada 6 ticks (~18 min).
     /// </summary>
-    private static async Task IniciarCacheYSincronizacionAsync()
+    public static void IniciarSincronizacionSiCorresponde()
     {
-        await Cache.InicializarAsync();
-        _syncTimer = new System.Threading.Timer(async _ => await SincronizarAsync(), null, TimeSpan.Zero, TimeSpan.FromMinutes(3));
+        if (_syncTimer != null) return; // ya arrancada (ej. re-login en la misma sesión del proceso)
+        if (!PerfilActual.AccesoCaja && !PerfilActual.EsAdministrador) return;
+
+        var jitter = TimeSpan.FromSeconds(Random.Shared.Next(0, 60));
+        _syncTimer = new System.Threading.Timer(async _ => await SincronizarAsync(), null, jitter, TimeSpan.FromMinutes(3));
     }
 
     private static async Task SincronizarAsync()
@@ -54,7 +62,10 @@ public partial class App : Application
                 await Api.RegistrarVenta(cbte);
                 await Cache.EliminarPendienteAsync(id);
             }
-            await Cache.RefrescarAsync(Api);
+
+            _syncTicks++;
+            if (_syncTicks % 6 == 1) // primer tick incluido, después cada ~18 min
+                await Cache.RefrescarAsync(Api);
         }
         catch
         {

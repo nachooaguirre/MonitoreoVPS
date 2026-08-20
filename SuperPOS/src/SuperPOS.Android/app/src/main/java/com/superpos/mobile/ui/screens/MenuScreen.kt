@@ -54,7 +54,7 @@ fun MenuScreen(
             } catch (e: Exception) {
                 isOnline = false
             }
-            delay(10000) // Verificar cada 10 segundos
+            delay(30000) // Verificar cada 30 segundos (solo mientras esta pantalla está activa)
         }
     }
 

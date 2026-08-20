@@ -48,7 +48,10 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         InitializeComponent();
         TxtUsuarioNav.Text = $"🚪  {usuario}";
         CargarLogoNav();
-        _stockTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(90) };
+        // SignalR (VentaRealizada/StockBajo) ya empuja la actualización en tiempo real — este timer
+        // es solo respaldo por si el hub se desconecta, así que no hace falta que sea frecuente.
+        // Con muchas terminales abiertas a la vez, cada segundo de más acá es tráfico multiplicado.
+        _stockTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(10) };
         _stockTimer.Tick += async (_, _) => await ConsultarAlertasStockAsync();
         Loaded += OnMainWindowLoaded;
         Closed += (_, _) => { _stockTimer.Stop(); _ = _posHub?.DisposeAsync(); };

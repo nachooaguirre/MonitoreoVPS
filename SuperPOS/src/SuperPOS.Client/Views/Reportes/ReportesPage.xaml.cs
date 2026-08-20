@@ -59,6 +59,8 @@ public partial class ReportesPage : Page
     {
         await ConsultarVentasDia();
         await ConsultarHistorial();
+        await ConsultarPeriodo();
+        await ConsultarRanking();
     }
 
     // ─── Eventos ──────────────────────────────────────────────
@@ -127,7 +129,7 @@ public partial class ReportesPage : Page
             var desde   = DpDesde.SelectedDate ?? DateTime.Today.AddMonths(-1);
             var hasta   = DpHasta.SelectedDate ?? DateTime.Today;
             var agrupar = CboAgrupar.SelectedIndex == 1 ? "mes" : "dia";
-            var r       = await App.Api.GetVentasPeriodo(desde, hasta, agrupar);
+            var r       = await App.Api.GetVentasPeriodo(desde, hasta, agrupar, IdSucursalFiltro);
             if (r is null) return;
 
             TxtTotalPeriodo.Text = r.TotalPeriodo.ToString("$ #,##0.00");
@@ -188,7 +190,7 @@ public partial class ReportesPage : Page
             var desde = DpRankingDesde.SelectedDate ?? DateTime.Today.AddMonths(-1);
             var hasta = DpRankingHasta.SelectedDate ?? DateTime.Today;
             var top   = (int)(NumTop.Value ?? 10);
-            var items = await App.Api.GetRankingProductos(desde, hasta, top);
+            var items = await App.Api.GetRankingProductos(desde, hasta, top, IdSucursalFiltro);
             if (items is null || items.Count == 0) return;
 
             // Horizontal bar chart (invertir: XAxes=valores, YAxes=labels)

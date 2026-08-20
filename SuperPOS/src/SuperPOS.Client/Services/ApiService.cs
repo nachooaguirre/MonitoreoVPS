@@ -480,11 +480,19 @@ public class ApiService
     public async Task<List<SucursalSimpleDto>> GetMisSucursales() =>
         await _http.GetFromJsonAsync<List<SucursalSimpleDto>>("api/usuarios/mis-sucursales", _json) ?? [];
 
-    public async Task<VentasPeriodoResult?> GetVentasPeriodo(DateTime desde, DateTime hasta, string agrupar = "dia") =>
-        await _http.GetFromJsonAsync<VentasPeriodoResult>($"api/reportes/ventas-periodo?desde={desde:yyyy-MM-dd}&hasta={hasta:yyyy-MM-dd}&agrupar={agrupar}", _json);
+    public async Task<VentasPeriodoResult?> GetVentasPeriodo(DateTime desde, DateTime hasta, string agrupar = "dia", int? idSucursal = null)
+    {
+        var url = $"api/reportes/ventas-periodo?desde={desde:yyyy-MM-dd}&hasta={hasta:yyyy-MM-dd}&agrupar={agrupar}";
+        if (idSucursal.HasValue) url += $"&idSucursal={idSucursal}";
+        return await _http.GetFromJsonAsync<VentasPeriodoResult>(url, _json);
+    }
 
-    public async Task<List<RankingProductoDto>?> GetRankingProductos(DateTime desde, DateTime hasta, int top = 20) =>
-        await _http.GetFromJsonAsync<List<RankingProductoDto>>($"api/reportes/ranking-productos?desde={desde:yyyy-MM-dd}&hasta={hasta:yyyy-MM-dd}&top={top}", _json);
+    public async Task<List<RankingProductoDto>?> GetRankingProductos(DateTime desde, DateTime hasta, int top = 20, int? idSucursal = null)
+    {
+        var url = $"api/reportes/ranking-productos?desde={desde:yyyy-MM-dd}&hasta={hasta:yyyy-MM-dd}&top={top}";
+        if (idSucursal.HasValue) url += $"&idSucursal={idSucursal}";
+        return await _http.GetFromJsonAsync<List<RankingProductoDto>>(url, _json);
+    }
 
     public async Task<StockBajoMinimoResult?> GetStockBajoMinimo() =>
         await _http.GetFromJsonAsync<StockBajoMinimoResult>("api/reportes/stock-bajo-minimo", _json);
