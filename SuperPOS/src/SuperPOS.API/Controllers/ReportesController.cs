@@ -11,14 +11,21 @@ namespace SuperPOS.API.Controllers;
 public class ReportesController(SuperPOSDbContext db) : ControllerBase
 {
     [HttpGet("ventas-dia")]
-    public async Task<IActionResult> VentasDia([FromQuery] DateTime? fecha)
+    public async Task<IActionResult> VentasDia([FromQuery] DateTime? fecha, [FromQuery] int? idSucursal)
     {
         var dia = (fecha?.ToUtc() ?? DateTime.UtcNow).Date;
         var desde = DateTime.SpecifyKind(dia, DateTimeKind.Utc);
         var hasta = DateTime.SpecifyKind(dia.AddDays(1), DateTimeKind.Utc);
 
-        var comprobantes = await db.Comprobantes
-            .Where(c => c.Fecha >= desde && c.Fecha < hasta && c.Estado != EstadoComprobante.Anulado)
+        var permitidas = await SucursalScopeHelper.ObtenerPermitidasAsync(User, db);
+        if (idSucursal.HasValue && permitidas != null && !permitidas.Contains(idSucursal.Value))
+            return Forbid();
+
+        var q = db.Comprobantes.Where(c => c.Fecha >= desde && c.Fecha < hasta && c.Estado != EstadoComprobante.Anulado);
+        if (idSucursal.HasValue) q = q.Where(c => c.IdSucursal == idSucursal.Value);
+        else if (permitidas != null) q = q.Where(c => permitidas.Contains(c.IdSucursal));
+
+        var comprobantes = await q
             .Include(c => c.Pagos).ThenInclude(p => p.MedioPago)
             .ToListAsync();
 

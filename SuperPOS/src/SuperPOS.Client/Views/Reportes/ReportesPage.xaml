@@ -47,6 +47,9 @@
                     </StackPanel>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Sucursal:" FontSize="12" Foreground="#7090B0" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <ComboBox x:Name="CboSucursalFiltro" Width="180" DisplayMemberPath="Nombre" SelectedValuePath="Id"
+                              Margin="0,0,16,0" SelectionChanged="CboSucursalFiltro_SelectionChanged"/>
                     <TextBlock x:Name="TxtFechaHoy" FontSize="13" Foreground="#808090" VerticalAlignment="Center" Margin="0,0,16,0"/>
                 </StackPanel>
             </Grid>

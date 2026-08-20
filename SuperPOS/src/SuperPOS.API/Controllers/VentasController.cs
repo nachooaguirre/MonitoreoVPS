@@ -14,8 +14,12 @@ namespace SuperPOS.API.Controllers;
 public class VentasController(SuperPOSDbContext db, IHubContext<PosHub> hub, AfipService afip, IConfiguration _config) : ControllerBase
 {
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] DateTime? desde, [FromQuery] DateTime? hasta, [FromQuery] int page = 1, [FromQuery] int pageSize = 50)
+    public async Task<IActionResult> GetAll([FromQuery] DateTime? desde, [FromQuery] DateTime? hasta, [FromQuery] int? idSucursal, [FromQuery] int page = 1, [FromQuery] int pageSize = 50)
     {
+        var permitidas = await SucursalScopeHelper.ObtenerPermitidasAsync(User, db);
+        if (idSucursal.HasValue && permitidas != null && !permitidas.Contains(idSucursal.Value))
+            return Forbid();
+
         var q = db.Comprobantes
             .Include(c => c.Cliente)
             .Include(c => c.TipoComprobante)
@@ -23,6 +27,8 @@ public class VentasController(SuperPOSDbContext db, IHubContext<PosHub> hub, Afi
 
         if (desde.HasValue) q = q.Where(c => c.Fecha >= desde.Value.ToUtc());
         if (hasta.HasValue) q = q.Where(c => c.Fecha <= hasta.Value.ToUtc().AddDays(1));
+        if (idSucursal.HasValue) q = q.Where(c => c.IdSucursal == idSucursal.Value);
+        else if (permitidas != null) q = q.Where(c => permitidas.Contains(c.IdSucursal));
 
         var total = await q.CountAsync();
         var items = await q.OrderByDescending(c => c.Fecha).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();

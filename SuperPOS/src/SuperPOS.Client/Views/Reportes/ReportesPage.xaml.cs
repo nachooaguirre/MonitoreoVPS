@@ -28,6 +28,7 @@ public partial class ReportesPage : Page
 
         Loaded += async (_, _) =>
         {
+            await CargarSucursalesFiltro();
             await ConsultarVentasDia();
             await ConsultarHistorial();
             await ConsultarStockBajo();
@@ -35,6 +36,29 @@ public partial class ReportesPage : Page
             await ConsultarCalendarioPagos();
             await ConsultarRentabilidadProveedores();
         };
+    }
+
+    // ─── Filtro de sucursal (global para las pestañas de ventas) ──
+    /// <summary>Sucursal elegida en el filtro, o null = todas las que el usuario puede ver.</summary>
+    private int? IdSucursalFiltro => CboSucursalFiltro.SelectedValue is int id && id > 0 ? id : null;
+
+    private async Task CargarSucursalesFiltro()
+    {
+        try
+        {
+            var sucursales = await App.Api.GetMisSucursales();
+            var conTodas = new List<SucursalSimpleDto> { new() { Id = 0, Nombre = "(Todas)" } };
+            conTodas.AddRange(sucursales);
+            CboSucursalFiltro.ItemsSource = conTodas;
+            CboSucursalFiltro.SelectedIndex = 0;
+        }
+        catch (Exception ex) { MessageBox.Show($"Error al cargar sucursales: {ex.Message}"); }
+    }
+
+    private async void CboSucursalFiltro_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        await ConsultarVentasDia();
+        await ConsultarHistorial();
     }
 
     // ─── Eventos ──────────────────────────────────────────────
@@ -60,7 +84,7 @@ public partial class ReportesPage : Page
         try
         {
             var fecha = DpFechaDia.SelectedDate ?? DateTime.Today;
-            var r = await App.Api.GetVentasDia(fecha);
+            var r = await App.Api.GetVentasDia(fecha, IdSucursalFiltro);
             if (r is null) return;
 
             TxtTotalDia.Text       = r.Total.ToString("$ #,##0.00");
@@ -300,7 +324,7 @@ public partial class ReportesPage : Page
         try
         {
             var fecha = DpFechaHistorial.SelectedDate ?? DateTime.Today;
-            var res = await App.Api.GetVentas(desde: fecha, hasta: fecha, page: 1, pageSize: 200);
+            var res = await App.Api.GetVentas(desde: fecha, hasta: fecha, page: 1, pageSize: 200, idSucursal: IdSucursalFiltro);
             DgHistorialVentas.ItemsSource = res.items;
             LimpiarDetalle();
         }

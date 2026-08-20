@@ -122,6 +122,16 @@ public class UsuariosController(SuperPOSDbContext db, IConfiguration config) : C
         return NoContent();
     }
 
+    /// <summary>Sucursales que el usuario logueado puede usar para filtrar reportes/pantallas: todas si es admin, si no solo las asignadas.</summary>
+    [HttpGet("mis-sucursales")]
+    public async Task<IActionResult> GetMisSucursales()
+    {
+        var permitidas = await SucursalScopeHelper.ObtenerPermitidasAsync(User, db);
+        var q = db.Sucursales.AsNoTracking().Where(s => s.Activo);
+        if (permitidas != null) q = q.Where(s => permitidas.Contains(s.Id));
+        return Ok(await q.OrderBy(s => s.Nombre).Select(s => new { s.Id, s.Nombre }).ToListAsync());
+    }
+
     /// <summary>Sucursales a las que pertenece el usuario (puede ser más de una).</summary>
     [HttpGet("{id}/sucursales")]
     public async Task<IActionResult> GetSucursalesUsuario(int id) =>

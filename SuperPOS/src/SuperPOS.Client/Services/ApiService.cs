@@ -317,11 +317,12 @@ public class ApiService
         return await r.Content.ReadFromJsonAsync<Comprobante>(_json);
     }
 
-    public async Task<(int total, List<Comprobante> items)> GetVentas(DateTime? desde = null, DateTime? hasta = null, int page = 1, int pageSize = 50)
+    public async Task<(int total, List<Comprobante> items)> GetVentas(DateTime? desde = null, DateTime? hasta = null, int page = 1, int pageSize = 50, int? idSucursal = null)
     {
         var url = $"api/ventas?page={page}&pageSize={pageSize}";
         if (desde.HasValue) url += $"&desde={desde:yyyy-MM-dd}";
         if (hasta.HasValue) url += $"&hasta={hasta:yyyy-MM-dd}";
+        if (idSucursal.HasValue) url += $"&idSucursal={idSucursal}";
         var resp = await _http.GetFromJsonAsync<PagedResult<Comprobante>>(url, _json);
         return (resp?.Total ?? 0, resp?.Items ?? []);
     }
@@ -469,8 +470,15 @@ public class ApiService
     }
 
     // === REPORTES ===
-    public async Task<VentasDiaDto?> GetVentasDia(DateTime fecha) =>
-        await _http.GetFromJsonAsync<VentasDiaDto>($"api/reportes/ventas-dia?fecha={fecha:yyyy-MM-dd}", _json);
+    public async Task<VentasDiaDto?> GetVentasDia(DateTime fecha, int? idSucursal = null)
+    {
+        var url = $"api/reportes/ventas-dia?fecha={fecha:yyyy-MM-dd}";
+        if (idSucursal.HasValue) url += $"&idSucursal={idSucursal}";
+        return await _http.GetFromJsonAsync<VentasDiaDto>(url, _json);
+    }
+
+    public async Task<List<SucursalSimpleDto>> GetMisSucursales() =>
+        await _http.GetFromJsonAsync<List<SucursalSimpleDto>>("api/usuarios/mis-sucursales", _json) ?? [];
 
     public async Task<VentasPeriodoResult?> GetVentasPeriodo(DateTime desde, DateTime hasta, string agrupar = "dia") =>
         await _http.GetFromJsonAsync<VentasPeriodoResult>($"api/reportes/ventas-periodo?desde={desde:yyyy-MM-dd}&hasta={hasta:yyyy-MM-dd}&agrupar={agrupar}", _json);
