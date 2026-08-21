@@ -71,7 +71,8 @@
                               CanUserDeleteRows="False" GridLinesVisibility="Horizontal" RowHeight="42"
                               Background="Transparent" BorderThickness="0" Foreground="#F0F0F0"
                               RowBackground="#252525" AlternatingRowBackground="#222222"
-                              HorizontalGridLinesBrush="#333333">
+                              HorizontalGridLinesBrush="#333333"
+                              SelectionMode="Single" SelectionChanged="DgCola_SelectionChanged">
                         <DataGrid.ColumnHeaderStyle>
                             <Style TargetType="DataGridColumnHeader">
                                 <Setter Property="Background" Value="#222222"/>
@@ -134,13 +135,20 @@
 
                     <!-- Formato de etiquetas -->
                     <TextBlock Text="Formato de Etiqueta:" Foreground="#8090A0" FontSize="12" Margin="0,0,0,6"/>
-                    <ComboBox x:Name="CmbFormato" Height="36" SelectedIndex="1" Margin="0,0,0,16">
+                    <ComboBox x:Name="CmbFormato" Height="36" SelectedIndex="1" Margin="0,0,0,16" SelectionChanged="CmbFormato_SelectionChanged">
                         <ComboBoxItem Content="Góndola (60mm x 30mm)"/>
                         <ComboBoxItem Content="Chica (50mm x 30mm) — estándar"/>
                         <ComboBoxItem Content="Grande (80mm x 40mm)"/>
                     </ComboBox>
 
-                    <Separator Background="#2D2D2D" Margin="0,0,0,16"/>
+                    <TextBlock Text="Vista Previa:" Foreground="#8090A0" FontSize="12" Margin="0,0,0,6"/>
+                    <Border Background="#0A0A0A" CornerRadius="4" Padding="10" HorizontalAlignment="Center">
+                        <ContentControl x:Name="PreviewHost"/>
+                    </Border>
+                    <TextBlock x:Name="TxtPreviewHint" Text="Elegí una etiqueta de la cola para previsualizarla."
+                               Foreground="#607080" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0" HorizontalAlignment="Center"/>
+
+                    <Separator Background="#2D2D2D" Margin="0,16,0,16"/>
 
                     <!-- Acciones -->
                     <ui:Button x:Name="BtnImprimir" Content="🖨️  Imprimir Cola" Height="48" FontSize="16" FontWeight="SemiBold"

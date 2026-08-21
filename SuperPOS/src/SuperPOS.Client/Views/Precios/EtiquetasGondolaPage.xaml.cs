@@ -42,12 +42,45 @@ namespace SuperPOS.Client.Views.Precios
                     DgCola.ItemsSource = _cola;
                     PanelColaVacia.Visibility = Visibility.Collapsed;
                     DgCola.Visibility = Visibility.Visible;
+                    DgCola.SelectedIndex = 0; // dispara DgCola_SelectionChanged y arranca la vista previa
                 }
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Error al cargar la cola de etiquetas: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        private void DgCola_SelectionChanged(object sender, SelectionChangedEventArgs e) => ActualizarPreview();
+        private void CmbFormato_SelectionChanged(object sender, SelectionChangedEventArgs e) => ActualizarPreview();
+
+        /// <summary>Muestra en pantalla, con el mismo control que se usa al imprimir, cómo va a quedar la etiqueta seleccionada.</summary>
+        private void ActualizarPreview()
+        {
+            if (PreviewHost is null) return; // todavía no cargó el XAML (SelectionChanged inicial del ComboBox)
+
+            var item = DgCola.SelectedItem as EtiquetaColaItemDto ?? _cola.FirstOrDefault();
+            if (item?.Articulo is null)
+            {
+                PreviewHost.Content = null;
+                TxtPreviewHint.Text = "Elegí una etiqueta de la cola para previsualizarla.";
+                TxtPreviewHint.Visibility = Visibility.Visible;
+                return;
+            }
+
+            var (width, height, isChica) = ObtenerDimensionesFormato();
+            PreviewHost.Content = new VisualLabelElement(item.Articulo, width, height, isChica);
+            TxtPreviewHint.Visibility = Visibility.Collapsed;
+        }
+
+        private (double width, double height, bool isChica) ObtenerDimensionesFormato()
+        {
+            var formatStr = (CmbFormato.SelectedItem as ComboBoxItem)?.Content.ToString() ?? "";
+            bool isGondola = formatStr.Contains("Góndola");
+            bool isChica = formatStr.Contains("Chica");
+            double width = isGondola ? 227 : (isChica ? 189 : 302);
+            double height = (isGondola || isChica) ? 113 : 151;
+            return (width, height, isChica);
         }
 
         private async void TxtBuscarArticulo_KeyDown(object sender, KeyEventArgs e)
@@ -159,16 +192,7 @@ namespace SuperPOS.Client.Views.Precios
             {
                 try
                 {
-                    var formatStr = (CmbFormato.SelectedItem as ComboBoxItem)?.Content.ToString() ?? "";
-                    bool isGondola = formatStr.Contains("Góndola");
-                    bool isChica = formatStr.Contains("Chica");
-
-                    // Formato física aproximado en Px (96 DPI)
-                    // Góndola: 60x30mm -> 227x113
-                    // Chica: 50x30mm -> 189x113
-                    // Grande: 80x40mm -> 302x151
-                    double width = isGondola ? 227 : (isChica ? 189 : 302);
-                    double height = (isGondola || isChica) ? 113 : 151;
+                    var (width, height, isChica) = ObtenerDimensionesFormato();
 
                     var doc = new FixedDocument();
 
