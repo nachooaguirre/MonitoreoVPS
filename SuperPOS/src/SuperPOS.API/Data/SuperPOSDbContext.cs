@@ -1221,7 +1221,8 @@ public class SuperPOSDbContext(DbContextOptions<SuperPOSDbContext> options, IHtt
             new MedioPago { Id = 7, Nombre = "Cheque", Tipo = TipoMedioPago.Cheque, RequiereReferencia = true, Activo = true },
             new MedioPago { Id = 8, Nombre = "Giro", Tipo = TipoMedioPago.Giro, RequiereReferencia = true, Activo = true },
             new MedioPago { Id = 9, Nombre = "Ticket", Tipo = TipoMedioPago.Ticket, RequiereReferencia = true, Activo = true },
-            new MedioPago { Id = 10, Nombre = "Otros", Tipo = TipoMedioPago.Otros, Activo = true }
+            new MedioPago { Id = 10, Nombre = "Otros", Tipo = TipoMedioPago.Otros, Activo = true },
+            new MedioPago { Id = 11, Nombre = "Cuenta DNI", Tipo = TipoMedioPago.CtaDni, RequiereReferencia = true, Activo = true }
         );
 
         m.Entity<TarjetaMarca>(e =>

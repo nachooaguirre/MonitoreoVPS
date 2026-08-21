@@ -21,10 +21,24 @@ public class KretzBalanzaService(string? ip, int puerto = 1001, string idEquipo 
     public bool Configurada => !string.IsNullOrWhiteSpace(ip);
 
     /// <summary>Comando 0002: test de comunicación sin sonido.</summary>
-    public Task<bool> TestConexionAsync(CancellationToken ct = default) => EnviarAsync("0002", "", ct);
+    public async Task<bool> TestConexionAsync(CancellationToken ct = default) => (await EnviarAsync("0002", "", ct)).ok;
+
+    /// <summary>
+    /// Comando 5001: lectura de la cantidad de PLU (productos) ya cargados en la balanza.
+    /// Es de solo lectura — no escribe nada — ideal para confirmar que la conexión funciona
+    /// y que estamos hablando con la balanza real (no solo que el puerto TCP responde).
+    /// Devuelve null si falló la comunicación.
+    /// </summary>
+    public async Task<int?> LeerCantidadPlusAsync(CancellationToken ct = default)
+    {
+        var (ok, datos) = await EnviarAsync("5001", "05", ct); // "05" = código de entidad PLU
+        if (!ok || datos.Length < 8) return null;
+        // Respuesta: Código de Entidad (2) + Numero de registros (6)
+        return int.TryParse(datos.Substring(2, 6), out var n) ? n : null;
+    }
 
     /// <summary>Comando 2005: alta/modificación de PLU. Usa el Id del artículo como número de PLU.</summary>
-    public Task<bool> EnviarPrecioAsync(Articulo art, CancellationToken ct = default)
+    public async Task<bool> EnviarPrecioAsync(Articulo art, CancellationToken ct = default)
     {
         var datos =
             Campo(art.Id.ToString(), 6) +               // Número del PLU
@@ -44,7 +58,7 @@ public class KretzBalanzaService(string? ip, int puerto = 1001, string idEquipo 
             "00" + "0000" + "0000" +                        // Cód. etiqueta / receta / nutricional
             "1" + "000" + "0000";                           // Fecha envase / vencimiento / imagen
 
-        return EnviarAsync("2005", datos, ct);
+        return (await EnviarAsync("2005", datos, ct)).ok;
     }
 
     private static string Campo(string valor, int largo)
@@ -59,9 +73,9 @@ public class KretzBalanzaService(string? ip, int puerto = 1001, string idEquipo 
         return s.Length >= largo ? s[^largo..] : s.PadLeft(largo, '0');
     }
 
-    private async Task<bool> EnviarAsync(string comando, string datos, CancellationToken ct)
+    private async Task<(bool ok, string datos)> EnviarAsync(string comando, string datos, CancellationToken ct)
     {
-        if (!Configurada) return false;
+        if (!Configurada) return (false, "");
 
         var payload = Encoding.ASCII.GetBytes("C" + idEquipo + comando + datos);
         var trama = new byte[1 + payload.Length + 2 + 1];
@@ -72,23 +86,36 @@ public class KretzBalanzaService(string? ip, int puerto = 1001, string idEquipo 
         trama[1 + payload.Length + 1] = checksumL;
         trama[^1] = ETX;
 
-        using var cliente = new TcpClient();
-        cliente.SendTimeout = 3000;
-        cliente.ReceiveTimeout = 3000;
-        await cliente.ConnectAsync(ip!, puerto, ct);
-        var stream = cliente.GetStream();
-        await stream.WriteAsync(trama, ct);
+        try
+        {
+            using var cliente = new TcpClient();
+            cliente.SendTimeout = 3000;
+            cliente.ReceiveTimeout = 3000;
+            await cliente.ConnectAsync(ip!, puerto, ct);
+            var stream = cliente.GetStream();
+            await stream.WriteAsync(trama, ct);
 
-        var buffer = new byte[512];
-        var leidos = await stream.ReadAsync(buffer, ct);
-        if (leidos < 8) return false;
+            var buffer = new byte[512];
+            var leidos = await stream.ReadAsync(buffer, ct);
+            if (leidos < 8) return (false, "");
 
-        // Respuesta: 0x07 'C' ID(2) GRUPO(2) RESPUESTA(2) DATOS CHECKSUM(2) 0x04. "01" = OK.
-        var texto = Encoding.ASCII.GetString(buffer, 0, leidos);
-        var inicio = texto.IndexOf((char)STX_RESPUESTA);
-        if (inicio < 0 || inicio + 7 > texto.Length) return false;
-        var codigoRespuesta = texto.Substring(inicio + 6, 2);
-        return codigoRespuesta == "01";
+            // Respuesta: 0x07 'C' ID(2) GRUPO(2) RESPUESTA(2) DATOS CHECKSUM(2) 0x04. "01" = OK.
+            var texto = Encoding.ASCII.GetString(buffer, 0, leidos);
+            var inicio = texto.IndexOf((char)STX_RESPUESTA);
+            if (inicio < 0 || inicio + 7 > texto.Length) return (false, "");
+            var codigoRespuesta = texto.Substring(inicio + 6, 2);
+            if (codigoRespuesta != "01") return (false, "");
+
+            var finDatos = texto.IndexOf((char)ETX, inicio);
+            var largoDatos = (finDatos < 0 ? texto.Length : finDatos) - 2 - (inicio + 7);
+            var respDatos = largoDatos > 0 ? texto.Substring(inicio + 7, largoDatos) : "";
+            return (true, respDatos);
+        }
+        catch
+        {
+            // Balanza apagada, IP/puerto mal, o desconectada de la red: fallar sin tirar excepción.
+            return (false, "");
+        }
     }
 
     private static (byte h, byte l) CalcularChecksum(ReadOnlySpan<byte> bytesPrevios)

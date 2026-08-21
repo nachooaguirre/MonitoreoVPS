@@ -92,6 +92,36 @@ public partial class ConfiguracionPage : Page
         catch (Exception ex) { TxtEstado.Text = $"Error: {ex.Message}"; }
     }
 
+    private async void BtnProbarBalanza_Click(object sender, RoutedEventArgs e)
+    {
+        if (!App.Balanza.Configurada)
+        {
+            TxtTestBalanza.Text = "No hay BalanzaIp configurada en appsettings.json de esta PC.";
+            return;
+        }
+
+        TxtTestBalanza.Text = "Probando conexión...";
+        var ok = await App.Balanza.TestConexionAsync();
+        TxtTestBalanza.Text = ok
+            ? "✅ Balanza respondió correctamente."
+            : "❌ No se pudo conectar o la balanza no respondió (revisá IP/puerto y que esté encendida).";
+    }
+
+    private async void BtnLeerPlusBalanza_Click(object sender, RoutedEventArgs e)
+    {
+        if (!App.Balanza.Configurada)
+        {
+            TxtTestBalanza.Text = "No hay BalanzaIp configurada en appsettings.json de esta PC.";
+            return;
+        }
+
+        TxtTestBalanza.Text = "Leyendo cantidad de PLU...";
+        var cantidad = await App.Balanza.LeerCantidadPlusAsync();
+        TxtTestBalanza.Text = cantidad.HasValue
+            ? $"✅ La balanza tiene {cantidad.Value} PLU cargados."
+            : "❌ No se pudo leer (revisá IP/puerto y que esté encendida).";
+    }
+
     private async void BtnGuardar_Click(object sender, RoutedEventArgs e)
     {
         _cfg ??= new ConfiguracionEmpresa();

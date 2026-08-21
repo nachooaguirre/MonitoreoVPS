@@ -23,7 +23,8 @@ public enum TipoMedioPago
     Vale = 8,
     Giro = 9,
     Ticket = 10,
-    Otros = 11
+    Otros = 11,
+    CtaDni = 12
 }
 
 /// <summary>Marca de tarjeta soportada por el cobro integrado (Posnet), con su recargo/descuento % opcional.</summary>

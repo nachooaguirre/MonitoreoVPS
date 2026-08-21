@@ -284,7 +284,11 @@
         <!-- Footer -->
         <Border Grid.Row="2" Padding="20,10" BorderThickness="0,1,0,0">
             <Grid>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <TextBlock x:Name="TxtTestBalanza" Grid.Column="0" VerticalAlignment="Center" Opacity="0.7"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <ui:Button Content="⚖️  Probar balanza" Height="38" Padding="20,0" Margin="0,0,8,0" Click="BtnProbarBalanza_Click"/>
+                    <ui:Button Content="📦  Leer PLUs cargados" Height="38" Padding="20,0" Margin="0,0,8,0" Click="BtnLeerPlusBalanza_Click"/>
                     <ui:Button x:Name="BtnGuardar" Content="💾  Guardar cambios" Appearance="Primary"
                                Height="38" Padding="20,0" Click="BtnGuardar_Click"/>
                 </StackPanel>

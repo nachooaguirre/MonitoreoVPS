@@ -401,6 +401,9 @@ public class ApiService
     public async Task<List<Perfil>> GetPerfiles() =>
         await _http.GetFromJsonAsync<List<Perfil>>("api/perfiles", _json) ?? [];
 
+    public async Task<List<MedioPago>> GetMediosPago() =>
+        await _http.GetFromJsonAsync<List<MedioPago>>("api/mediospago", _json) ?? [];
+
     public async Task<Perfil?> CrearPerfil(Perfil p)
     {
         var r = await _http.PostAsJsonAsync("api/perfiles", p);

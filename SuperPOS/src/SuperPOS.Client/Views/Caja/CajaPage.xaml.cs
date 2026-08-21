@@ -72,16 +72,7 @@ public partial class CajaPage : Page
     {
         try
         {
-            // Cargar medios de pago desde API (hardcoded por ahora hasta tener el endpoint)
-            _mediosPago = new List<MedioPago>
-            {
-                new() { Id = 1, Nombre = "Efectivo", Tipo = TipoMedioPago.Efectivo },
-                new() { Id = 2, Nombre = "Débito", Tipo = TipoMedioPago.TarjetaDebito },
-                new() { Id = 3, Nombre = "Crédito", Tipo = TipoMedioPago.TarjetaCredito },
-                new() { Id = 4, Nombre = "MercadoPago", Tipo = TipoMedioPago.MercadoPago },
-                new() { Id = 5, Nombre = "Transferencia", Tipo = TipoMedioPago.Transferencia },
-                new() { Id = 6, Nombre = "Cta. Corriente", Tipo = TipoMedioPago.CtaCte }
-            };
+            _mediosPago = await App.Api.GetMediosPago();
             CmbMedioPago.ItemsSource = _mediosPago;
             CmbMedioPago.SelectedIndex = 0;
 
