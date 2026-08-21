@@ -69,7 +69,13 @@ namespace SuperPOS.Client.Views.Precios
             }
 
             var (width, height, isChica) = ObtenerDimensionesFormato();
-            PreviewHost.Content = new VisualLabelElement(item.Articulo, width, height, isChica);
+            var label = new VisualLabelElement(item.Articulo, width, height, isChica)
+            {
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            PreviewHost.Content = label;
+            PreviewHost.UpdateLayout(); // fuerza medir/dibujar ya, en vez de esperar el próximo ciclo de layout
             TxtPreviewHint.Visibility = Visibility.Collapsed;
         }
 

@@ -356,8 +356,9 @@ public class ImportadorLegacyService
                     var medio = await _db.MediosPago.FirstOrDefaultAsync(m => m.Id == moneda);
                     if (medio == null)
                     {
-                        // Crear medio pago genérico para no romper la FK
-                        medio = new MedioPago { Id = moneda, Nombre = $"Medio Pago {moneda}", Tipo = TipoMedioPago.Vale, Activo = true };
+                        // Crear medio pago genérico para no romper la FK. Inactivo: es un placeholder sin
+                        // nombre real, no debe aparecer en el combo de Caja hasta que alguien lo revise.
+                        medio = new MedioPago { Id = moneda, Nombre = $"Medio Pago {moneda}", Tipo = TipoMedioPago.Vale, Activo = false };
                         _db.MediosPago.Add(medio);
                         await _db.SaveChangesAsync();
                     }
