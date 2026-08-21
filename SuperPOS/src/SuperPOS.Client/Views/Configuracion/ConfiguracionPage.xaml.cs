@@ -1,6 +1,10 @@
+using System.IO;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Win32;
+using SuperPOS.Client.Services;
 using SuperPOS.Shared.Entities.Ventas;
 
 namespace SuperPOS.Client.Views.Configuracion;
@@ -13,7 +17,54 @@ public partial class ConfiguracionPage : Page
     {
         InitializeComponent();
         CargarImpresoras();
+        CargarConfiguracionBalanza();
         Loaded += async (_, _) => await CargarConfiguracion();
+    }
+
+    private static string RutaAppSettings => Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+
+    /// <summary>La IP/puerto de la balanza es config local de esta PC (appsettings.json), no de la empresa en la nube.</summary>
+    private void CargarConfiguracionBalanza()
+    {
+        TxtBalanzaIp.Text = "";
+        TxtBalanzaPuerto.Text = "1001";
+        try
+        {
+            if (!File.Exists(RutaAppSettings)) return;
+            using var doc = JsonDocument.Parse(File.ReadAllText(RutaAppSettings));
+            var root = doc.RootElement;
+            if (root.TryGetProperty("BalanzaIp", out var ip) && ip.ValueKind == JsonValueKind.String)
+                TxtBalanzaIp.Text = ip.GetString() ?? "";
+            if (root.TryGetProperty("BalanzaPuerto", out var p) && p.TryGetInt32(out var puerto))
+                TxtBalanzaPuerto.Text = puerto.ToString();
+        }
+        catch { /* ignorar config rota */ }
+    }
+
+    private void BtnGuardarBalanza_Click(object sender, RoutedEventArgs e)
+    {
+        var ip = TxtBalanzaIp.Text.Trim();
+        if (!int.TryParse(TxtBalanzaPuerto.Text.Trim(), out var puerto) || puerto <= 0) puerto = 1001;
+
+        try
+        {
+            var raiz = File.Exists(RutaAppSettings)
+                ? JsonNode.Parse(File.ReadAllText(RutaAppSettings))!.AsObject()
+                : new JsonObject();
+
+            if (string.IsNullOrWhiteSpace(ip)) raiz.Remove("BalanzaIp");
+            else raiz["BalanzaIp"] = ip;
+            raiz["BalanzaPuerto"] = puerto;
+
+            File.WriteAllText(RutaAppSettings, raiz.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+
+            App.Balanza = new KretzBalanzaService(string.IsNullOrWhiteSpace(ip) ? null : ip, puerto);
+            TxtTestBalanza.Text = "✅ Configuración de balanza guardada.";
+        }
+        catch (Exception ex)
+        {
+            TxtTestBalanza.Text = $"❌ Error al guardar: {ex.Message}";
+        }
     }
 
     private void CargarImpresoras()
@@ -96,7 +147,7 @@ public partial class ConfiguracionPage : Page
     {
         if (!App.Balanza.Configurada)
         {
-            TxtTestBalanza.Text = "No hay BalanzaIp configurada en appsettings.json de esta PC.";
+            TxtTestBalanza.Text = "Ingresá la IP y guardá la configuración antes de probar.";
             return;
         }
 
@@ -111,7 +162,7 @@ public partial class ConfiguracionPage : Page
     {
         if (!App.Balanza.Configurada)
         {
-            TxtTestBalanza.Text = "No hay BalanzaIp configurada en appsettings.json de esta PC.";
+            TxtTestBalanza.Text = "Ingresá la IP y guardá la configuración antes de probar.";
             return;
         }
 

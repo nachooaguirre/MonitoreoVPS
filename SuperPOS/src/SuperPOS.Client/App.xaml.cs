@@ -15,7 +15,7 @@ public partial class App : Application
     public static ApiService Api { get; private set; } = null!;
     public static LocalCacheService Cache { get; } = new();
     /// <summary>Solo tiene efecto si esta PC configuró una balanza Kretz en su red local (appsettings.json).</summary>
-    public static KretzBalanzaService Balanza { get; private set; } = new(null);
+    public static KretzBalanzaService Balanza { get; set; } = new(null);
     public static string UsuarioNombre { get; set; } = "";
     // Retrocompatibilidad con código viejo que usa UsuarioActual como string
     public static string UsuarioActual { get => UsuarioNombre; set => UsuarioNombre = value; }
