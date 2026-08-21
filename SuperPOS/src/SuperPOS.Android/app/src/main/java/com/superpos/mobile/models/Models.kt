@@ -58,6 +58,9 @@ data class Article(
     val activo: Boolean = true,
     val aplicaIva: Boolean = true,
     val alicuotaIva: Double = 21.0,
+    val esPesable: Boolean = false,
+    val contenidoValor: Double = 1.0,
+    val contenidoUnidad: String = "UN",
     // Auxiliares para no complicar relaciones en Room
     val departamentoNombre: String? = null,
     val familiaNombre: String? = null,

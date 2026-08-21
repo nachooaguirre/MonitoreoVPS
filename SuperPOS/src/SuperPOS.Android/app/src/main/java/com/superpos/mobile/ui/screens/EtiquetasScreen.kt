@@ -2,6 +2,7 @@ package com.superpos.mobile.ui.screens
 
 import android.content.Context
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,6 +29,7 @@ import com.superpos.mobile.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,6 +46,7 @@ fun EtiquetasScreen(
 
     var barcodeInput by remember { mutableStateOf("") }
     var scannedArticle by remember { mutableStateOf<Article?>(null) }
+    var resultadosBusqueda by remember { mutableStateOf<List<Article>>(emptyList()) }
     var labelQty by remember { mutableStateOf("1") }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -53,12 +56,13 @@ fun EtiquetasScreen(
     var showCreateDialog by remember { mutableStateOf(false) }
     var pendingBarcode by remember { mutableStateOf("") }
 
-    // Search article logic
+    // Búsqueda por código de barras (escaneo o EAN exacto tipeado)
     fun performSearch(barcode: String) {
         if (barcode.isBlank()) return
         isLoading = true
         successMessage = null
         errorMessage = null
+        resultadosBusqueda = emptyList()
         scope.launch {
             try {
                 val service = ApiClient.getService(apiUrl)
@@ -76,6 +80,27 @@ fun EtiquetasScreen(
                 isLoading = false
             }
         }
+    }
+
+    // Búsqueda por nombre: muestra una lista para elegir el artículo exacto
+    fun buscarPorNombre(texto: String) {
+        if (texto.isBlank()) { resultadosBusqueda = emptyList(); return }
+        scope.launch {
+            try {
+                val service = ApiClient.getService(apiUrl)
+                val response = withContext(Dispatchers.IO) { service.searchArticles(texto) }
+                resultadosBusqueda = if (response.isSuccessful) response.body()?.items ?: emptyList() else emptyList()
+            } catch (e: Exception) {
+                errorMessage = "Error de red: ${e.message}"
+            }
+        }
+    }
+
+    fun elegirArticulo(art: Article) {
+        scannedArticle = art
+        labelQty = "1"
+        resultadosBusqueda = emptyList()
+        barcodeInput = ""
     }
 
     // Register broadcast laser scanner action callback
@@ -141,15 +166,15 @@ fun EtiquetasScreen(
             verticalArrangement = Arrangement.Top,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Scanner input
-            Text("Escanear Artículo para Góndola", fontSize = 12.sp, color = FluentLightGray, modifier = Modifier.fillMaxWidth())
+            // Scanner / búsqueda por nombre o EAN
+            Text("Escanear, o buscar por nombre / EAN", fontSize = 12.sp, color = FluentLightGray, modifier = Modifier.fillMaxWidth())
             Spacer(modifier = Modifier.height(4.dp))
             OutlinedTextField(
                 value = barcodeInput,
-                onValueChange = { barcodeInput = it },
-                placeholder = { Text("Escanear código EAN...") },
+                onValueChange = { barcodeInput = it; buscarPorNombre(it) },
+                placeholder = { Text("Escanear EAN o escribir nombre...") },
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = FluentWhite,
@@ -163,6 +188,24 @@ fun EtiquetasScreen(
                     }
                 }
             )
+
+            if (resultadosBusqueda.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Column(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp)
+                        .background(FluentDarkCard, RoundedCornerShape(6.dp))
+                ) {
+                    resultadosBusqueda.forEach { art ->
+                        Text(
+                            text = "${art.descripcion}  ·  $${"%.2f".format(Locale.US, art.precioVenta)}",
+                            color = FluentWhite, fontSize = 13.sp,
+                            modifier = Modifier.fillMaxWidth()
+                                .clickable { elegirArticulo(art) }
+                                .padding(10.dp)
+                        )
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -287,7 +330,7 @@ fun EtiquetasScreen(
                         }
                     }
                 }
-            } else {
+            } else if (resultadosBusqueda.isEmpty()) {
                 // Hint message
                 Box(
                     modifier = Modifier

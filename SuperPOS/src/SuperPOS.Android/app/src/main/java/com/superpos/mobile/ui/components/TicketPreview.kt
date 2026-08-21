@@ -98,6 +98,40 @@ fun TicketPreview(
 
         Spacer(modifier = Modifier.height(10.dp))
 
+        // Precio sin impuesto y precio por kilo/litro, igual que la etiqueta real que imprime el cliente WPF
+        val precioSinImp = if (article.aplicaIva) article.precioVenta / (1 + article.alicuotaIva / 100) else article.precioVenta
+        Text(
+            text = "Precio sin Imp.: $ %.3f".format(Locale.US, precioSinImp),
+            color = Color.Black,
+            fontSize = 10.sp,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center
+        )
+
+        val esPesable = article.esPesable || article.codigoBarras.startsWith("20")
+        val kiloTexto = when {
+            esPesable -> "Kilo: %.2f".format(Locale.US, article.precioVenta)
+            article.contenidoUnidad == "G" && article.contenidoValor > 0 -> "Kilo: %.2f".format(Locale.US, article.precioVenta * 1000 / article.contenidoValor)
+            article.contenidoUnidad == "KG" && article.contenidoValor > 0 -> "Kilo: %.2f".format(Locale.US, article.precioVenta / article.contenidoValor)
+            article.contenidoUnidad == "ML" && article.contenidoValor > 0 -> "Litro: %.2f".format(Locale.US, article.precioVenta * 1000 / article.contenidoValor)
+            article.contenidoUnidad == "L" && article.contenidoValor > 0 -> "Litro: %.2f".format(Locale.US, article.precioVenta / article.contenidoValor)
+            else -> null
+        }
+        kiloTexto?.let {
+            Text(
+                text = it,
+                color = Color.Black,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
         // Código de barras simulado vectorialmente por Canvas
         val barcodeStr = if (article.codigoBarras.isNotBlank()) article.codigoBarras else article.codigoInterno.ifBlank { "0000000000000" }
         Canvas(
