@@ -492,6 +492,112 @@ public class VentasController(SuperPOSDbContext db, IHubContext<PosHub> hub, Afi
         });
     }
 
+    /// <summary>Registra una nota de crédito/débito manual a un CLIENTE (ej. compensar un pago mal cobrado), fuera del circuito normal de venta — no mueve stock.</summary>
+    [HttpPost("nota-cliente")]
+    public async Task<IActionResult> RegistrarNotaCliente([FromBody] Comprobante cbte)
+    {
+        if (cbte.IdCliente is not > 0)
+            return BadRequest("IdCliente es obligatorio para una nota a cliente.");
+
+        var tipoCbte = await db.TiposComprobante.FindAsync(cbte.IdTipoComprobante);
+        if (tipoCbte is null) return BadRequest("Tipo de comprobante inválido.");
+
+        cbte.Fecha = DateTime.UtcNow;
+        cbte.Estado = EstadoComprobante.Emitido;
+        cbte.IdProveedor = null;
+
+        var lockKey = $"cbte:{cbte.IdSucursal}:{cbte.PuntoVenta}:{cbte.IdTipoComprobante}:{cbte.Letra}";
+        await using (var tx = await db.Database.BeginTransactionAsync())
+        {
+            await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({lockKey}))");
+
+            var ultimo = await db.Comprobantes
+                .Where(c => c.PuntoVenta == cbte.PuntoVenta && c.IdTipoComprobante == cbte.IdTipoComprobante && c.Letra == cbte.Letra)
+                .MaxAsync(c => (long?)c.Numero) ?? 0;
+            cbte.Numero = ultimo + 1;
+
+            db.Comprobantes.Add(cbte);
+            await db.SaveChangesAsync();
+            await tx.CommitAsync();
+        }
+
+        // Cuenta corriente: Consumidor Final (Id=1, ventas de mostrador) no lleva saldo — solo clientes reales.
+        if (cbte.IdCliente.Value != 1 && cbte.Total > 0)
+        {
+            var cliente = await db.Clientes.FindAsync(cbte.IdCliente.Value);
+            if (cliente != null)
+            {
+                var esCredito = tipoCbte.Nombre.Contains("Crédito", StringComparison.OrdinalIgnoreCase);
+                cliente.SaldoCtaCte += esCredito ? -cbte.Total : cbte.Total;
+                if (cliente.SaldoCtaCte < 0) cliente.SaldoCtaCte = 0;
+                cliente.EsMoroso = cliente.SaldoCtaCte > 0 && DateTime.UtcNow > (cliente.FechaVtoCtaCte ?? DateTime.MaxValue);
+
+                db.MovimientosCtaCte.Add(new MovimientoCtaCte
+                {
+                    IdCliente = cliente.Id,
+                    Fecha = cbte.Fecha,
+                    Tipo = esCredito ? TipoMovimientoCte.NotaCredito : TipoMovimientoCte.NotaDebito,
+                    Concepto = cbte.Observaciones ?? $"{tipoCbte.Nombre} {cbte.Letra} {cbte.PuntoVenta:0000}-{cbte.Numero:00000000}",
+                    IdComprobante = cbte.Id,
+                    Debe = esCredito ? 0 : cbte.Total,
+                    Haber = esCredito ? cbte.Total : 0,
+                    SaldoAcumulado = cliente.SaldoCtaCte,
+                    IdUsuario = cbte.IdUsuario > 0 ? cbte.IdUsuario : null
+                });
+                await db.SaveChangesAsync();
+            }
+        }
+
+        if (tipoCbte.RequiereCAE)
+        {
+            try
+            {
+                var cliente = await db.Clientes.FindAsync(cbte.IdCliente);
+                var cfg = await db.ConfiguracionEmpresa.FirstOrDefaultAsync();
+                var (tipoDoc, nroDoc) = ObtenerDatosDocumentoAfip(cliente);
+                var neto = cbte.SubTotal - cbte.TotalDescuento;
+
+                var solicitud = new SolicitudCAE
+                {
+                    PuntoVenta      = cbte.PuntoVenta,
+                    TipoComprobante = ObtenerCodigoAfip(tipoCbte, cbte.Letra, comision: 0),
+                    NroComprobante  = cbte.Numero,
+                    Fecha           = cbte.Fecha,
+                    Concepto        = 1,
+                    TipoDocCliente  = tipoDoc,
+                    NroDocCliente   = nroDoc,
+                    ImporteNeto     = neto,
+                    ImporteIva      = cbte.TotalIva21 + cbte.TotalIva105,
+                    ImporteTotal    = cbte.Total,
+                    Ivas            = ObtenerIvas(cbte)
+                };
+
+                var resultado = await afip.SolicitarCAEAsync(solicitud);
+                await RegistrarLogAfipAsync(cbte.Id, resultado);
+                if (resultado.Exito)
+                {
+                    cbte.CAE            = long.TryParse(resultado.CAE, out var caeNum) ? caeNum : null;
+                    cbte.CAEVencimiento = resultado.FechaVencimientoCAE;
+                    cbte.QrAfip         = resultado.GenerarQRAfip(
+                        cfg?.Cuit ?? _config["Afip:CUIT"] ?? "",
+                        cbte.PuntoVenta, solicitud.TipoComprobante, cbte.Fecha, cbte.Total, tipoDoc, nroDoc);
+                    await db.SaveChangesAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                await RegistrarLogAfipAsync(cbte.Id, null, ex.Message);
+                Console.WriteLine($"[AFIP] Error al solicitar CAE (nota a cliente): {ex.Message}");
+            }
+        }
+
+        return CreatedAtAction(nameof(GetById), new { id = cbte.Id }, new
+        {
+            cbte.Id, cbte.Numero, cbte.Letra, cbte.PuntoVenta, cbte.Fecha, cbte.Total,
+            cbte.CAE, cbte.CAEVencimiento, cbte.QrAfip, cbte.Estado
+        });
+    }
+
     [HttpPost("{id}/anular")]
     public async Task<IActionResult> Anular(long id, [FromQuery] int idUsuario)
     {

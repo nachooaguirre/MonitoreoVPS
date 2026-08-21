@@ -28,6 +28,8 @@ public class Compra
     public decimal Total { get; set; }
     public string? Observaciones { get; set; }
     public bool Pagada { get; set; }
+    /// <summary>False si la conciliación remito↔factura encontró diferencias sin resolver (ver RemitosController.ConciliarConCompra) — bloquea el pago hasta emitir la Nota de Crédito/Débito correspondiente.</summary>
+    public bool Conciliada { get; set; } = true;
 
     public Proveedor? Proveedor { get; set; }
     public TipoComprobante? TipoComprobante { get; set; }

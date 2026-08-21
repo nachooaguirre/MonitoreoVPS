@@ -12,12 +12,13 @@ public class ComprasController(SuperPOSDbContext db) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] DateTime? desde, [FromQuery] DateTime? hasta,
-        [FromQuery] EstadoCompra? estado, [FromQuery] int page = 1, [FromQuery] int pageSize = 50)
+        [FromQuery] EstadoCompra? estado, [FromQuery] int? idProveedor, [FromQuery] int page = 1, [FromQuery] int pageSize = 50)
     {
         var q = db.Compras.Include(c => c.Proveedor).AsQueryable();
         if (desde.HasValue) q = q.Where(c => c.Fecha >= desde.Value.ToUtc());
         if (hasta.HasValue) q = q.Where(c => c.Fecha <= hasta.Value.ToUtc().AddDays(1));
         if (estado.HasValue) q = q.Where(c => c.Estado == estado);
+        if (idProveedor.HasValue) q = q.Where(c => c.IdProveedor == idProveedor.Value);
         var total = await q.CountAsync();
         var items = await q.OrderByDescending(c => c.Fecha).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
         return Ok(new { total, page, pageSize, items });
@@ -111,7 +112,7 @@ public class ComprasController(SuperPOSDbContext db) : ControllerBase
     {
         var q = db.Compras
             .Include(c => c.Proveedor)
-            .Where(c => c.Estado == EstadoCompra.Recibida && !c.Pagada);
+            .Where(c => c.Estado == EstadoCompra.Recibida && !c.Pagada && c.Conciliada);
         if (idProveedor.HasValue) q = q.Where(c => c.IdProveedor == idProveedor.Value);
 
         var hoy = DateTime.UtcNow.Date;

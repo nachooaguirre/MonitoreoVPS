@@ -520,6 +520,13 @@ public class ApiService
         r.EnsureSuccessStatusCode();
     }
 
+    /// <summary>Registra una Nota de Crédito/Débito recibida DEL proveedor (documento externo, sin CAE propio).</summary>
+    public async Task AjusteManualCtaCteProveedor(int idProveedor, decimal monto, bool esDebito, string? concepto, int idUsuario, long? idCompra = null)
+    {
+        var r = await _http.PostAsJsonAsync("api/ctacte-proveedores/ajuste", new { idProveedor, monto, esDebito, concepto, idUsuario, idCompra });
+        r.EnsureSuccessStatusCode();
+    }
+
 
 
     public async Task<Comprobante?> GetVentaById(long id) =>
@@ -929,6 +936,48 @@ public class ApiService
             throw new InvalidOperationException(err.Length > 200 ? err[..200] : err);
         }
         return await r.Content.ReadFromJsonAsync<JsonElement>(_json);
+    }
+
+    public async Task<List<Compra>> GetCompras(int? idProveedor = null, int? estado = null)
+    {
+        var url = "api/compras?pageSize=200";
+        if (idProveedor.HasValue) url += $"&idProveedor={idProveedor}";
+        if (estado.HasValue) url += $"&estado={estado}";
+        var resp = await _http.GetFromJsonAsync<PagedResult<Compra>>(url, _json);
+        return resp?.Items ?? [];
+    }
+
+    public async Task<JsonElement> ConciliarRemitoConCompra(int idRemito, int idCompra)
+    {
+        var r = await _http.PutAsync($"api/remitos/{idRemito}/conciliar/{idCompra}", null);
+        if (!r.IsSuccessStatusCode)
+        {
+            var err = await r.Content.ReadAsStringAsync();
+            throw new InvalidOperationException(err.Length > 300 ? err[..300] : err);
+        }
+        return await r.Content.ReadFromJsonAsync<JsonElement>(_json);
+    }
+
+    public async Task<Comprobante?> RegistrarNotaProveedor(Comprobante cbte)
+    {
+        var r = await _http.PostAsJsonAsync("api/ventas/nota-proveedor", cbte, _json);
+        if (!r.IsSuccessStatusCode)
+        {
+            var err = await r.Content.ReadAsStringAsync();
+            throw new InvalidOperationException(err.Length > 300 ? err[..300] : err);
+        }
+        return await r.Content.ReadFromJsonAsync<Comprobante>(_json);
+    }
+
+    public async Task<Comprobante?> RegistrarNotaCliente(Comprobante cbte)
+    {
+        var r = await _http.PostAsJsonAsync("api/ventas/nota-cliente", cbte, _json);
+        if (!r.IsSuccessStatusCode)
+        {
+            var err = await r.Content.ReadAsStringAsync();
+            throw new InvalidOperationException(err.Length > 300 ? err[..300] : err);
+        }
+        return await r.Content.ReadFromJsonAsync<Comprobante>(_json);
     }
 
     public async Task<JsonElement?> GetOrdenCompraDetalle(int id)

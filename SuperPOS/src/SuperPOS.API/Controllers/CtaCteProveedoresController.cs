@@ -68,6 +68,10 @@ public class CtaCteProveedoresController(SuperPOSDbContext db) : ControllerBase
         return Ok(new { nuevoSaldo = proveedor.SaldoCtaCte });
     }
 
+    /// <summary>
+    /// Registra una Nota de Crédito o Débito recibida DEL proveedor (documento externo, no lleva CAE propio).
+    /// Si se referencia una Compra (factura discutida), esta queda marcada como conciliada — habilitando su pago.
+    /// </summary>
     [HttpPost("ajuste")]
     public async Task<IActionResult> AjusteManual([FromBody] AjusteCtaCteProveedorRequest req)
     {
@@ -89,14 +93,21 @@ public class CtaCteProveedoresController(SuperPOSDbContext db) : ControllerBase
             Debe = req.EsDebito ? req.Monto : 0,
             Haber = req.EsDebito ? 0 : req.Monto,
             SaldoAcumulado = proveedor.SaldoCtaCte,
-            IdUsuario = req.IdUsuario
+            IdUsuario = req.IdUsuario,
+            IdCompra = req.IdCompra
         };
-
         db.MovimientosCtaCteProveedor.Add(mov);
+
+        if (req.IdCompra.HasValue)
+        {
+            var compra = await db.Compras.FindAsync(req.IdCompra.Value);
+            if (compra != null) compra.Conciliada = true;
+        }
+
         await db.SaveChangesAsync();
         return Ok(new { nuevoSaldo = proveedor.SaldoCtaCte });
     }
 }
 
 public record PagoCtaCteProveedorRequest(int IdProveedor, decimal Monto, string? Concepto, int? IdUsuario, long? IdCompra = null);
-public record AjusteCtaCteProveedorRequest(int IdProveedor, decimal Monto, bool EsDebito, string? Concepto, int? IdUsuario);
+public record AjusteCtaCteProveedorRequest(int IdProveedor, decimal Monto, bool EsDebito, string? Concepto, int? IdUsuario, long? IdCompra = null);

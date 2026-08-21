@@ -71,6 +71,7 @@ public class RemitosController(SuperPOSDbContext db) : ControllerBase
             r.Observaciones,
             r.IdOrdenCompra,
             r.IdCompra,
+            r.IdProveedor,
             r.IdUsuario,
             ProveedorNombre = r.Proveedor?.RazonSocial,
             ClienteNombre   = r.Cliente?.RazonSocial,
@@ -261,6 +262,57 @@ public class RemitosController(SuperPOSDbContext db) : ControllerBase
         if (eventos.Count > 0) db.TrazabilidadEventos.AddRange(eventos);
         await db.SaveChangesAsync();
         return Ok(new { remito.Id, remito.NroRemito, remito.Estado, CantArticulos = remito.Detalles.Count });
+    }
+
+    /// <summary>
+    /// Concilia un remito ya confirmado (lo realmente recibido) contra la factura del proveedor (Compra).
+    /// Si hay diferencias de cantidad, la Compra queda marcada como no conciliada (bloquea el pago) y se
+    /// devuelve el detalle de diferencias para que el usuario emita una Nota de Crédito/Débito al proveedor.
+    /// </summary>
+    [HttpPut("{id}/conciliar/{idCompra}")]
+    public async Task<IActionResult> ConciliarConCompra(int id, int idCompra)
+    {
+        var remito = await db.Remitos.Include(r => r.Detalles).FirstOrDefaultAsync(r => r.Id == id);
+        if (remito is null) return NotFound("Remito no encontrado.");
+        if (remito.Estado != EstadoRemito.Confirmado) return BadRequest("El remito debe estar confirmado antes de conciliar contra la factura.");
+
+        var compra = await db.Compras.Include(c => c.Detalles).FirstOrDefaultAsync(c => c.Id == idCompra);
+        if (compra is null) return NotFound("Compra no encontrada.");
+
+        remito.IdCompra = idCompra;
+
+        var idsArticulos = compra.Detalles.Select(d => d.IdArticulo)
+            .Union(remito.Detalles.Select(d => d.IdArticulo))
+            .Distinct();
+
+        var diferencias = new List<object>();
+        foreach (var idArt in idsArticulos)
+        {
+            var cd = compra.Detalles.FirstOrDefault(d => d.IdArticulo == idArt);
+            var rd = remito.Detalles.FirstOrDefault(d => d.IdArticulo == idArt);
+            var facturado = cd?.Cantidad ?? 0;
+            var recibido = rd?.CantidadRecibida ?? 0;
+            if (facturado == recibido) continue;
+
+            var art = await db.Articulos.FindAsync(idArt);
+            var precioCosto = cd?.PrecioCostoNeto ?? rd?.PrecioCosto ?? 0;
+            diferencias.Add(new
+            {
+                IdArticulo = idArt,
+                Descripcion = art?.Descripcion,
+                CantidadFacturada = facturado,
+                CantidadRecibida = recibido,
+                Diferencia = facturado - recibido,
+                PrecioCosto = precioCosto,
+                AlicuotaIva = cd?.AlicuotaIva ?? 21,
+                MontoDiferencia = (facturado - recibido) * precioCosto
+            });
+        }
+
+        compra.Conciliada = diferencias.Count == 0;
+        await db.SaveChangesAsync();
+
+        return Ok(new { remito.Id, IdCompra = idCompra, compra.Conciliada, Diferencias = diferencias });
     }
 
     [HttpPut("{id}/anular")]

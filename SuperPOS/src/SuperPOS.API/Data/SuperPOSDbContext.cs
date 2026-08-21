@@ -1208,7 +1208,10 @@ public class SuperPOSDbContext(DbContextOptions<SuperPOSDbContext> options, IHtt
             new TipoComprobante { Id = 6, Nombre = "Nota de Crédito C", Abreviatura = "NCC", EsVenta = true, RequiereCAE = true, CodigoAfip = 13, Activo = true },
             new TipoComprobante { Id = 7, Nombre = "Ticket", Abreviatura = "TK", EsVenta = true, RequiereCAE = false, Activo = true },
             new TipoComprobante { Id = 8, Nombre = "Remito", Abreviatura = "REM", EsVenta = false, RequiereCAE = false, Activo = true },
-            new TipoComprobante { Id = 9, Nombre = "Presupuesto", Abreviatura = "PRE", EsVenta = false, RequiereCAE = false, Activo = true }
+            new TipoComprobante { Id = 9, Nombre = "Presupuesto", Abreviatura = "PRE", EsVenta = false, RequiereCAE = false, Activo = true },
+            new TipoComprobante { Id = 10, Nombre = "Nota de Débito A", Abreviatura = "NDA", EsVenta = true, RequiereCAE = true, CodigoAfip = 2, Activo = true },
+            new TipoComprobante { Id = 11, Nombre = "Nota de Débito B", Abreviatura = "NDB", EsVenta = true, RequiereCAE = true, CodigoAfip = 7, Activo = true },
+            new TipoComprobante { Id = 12, Nombre = "Nota de Débito C", Abreviatura = "NDC", EsVenta = true, RequiereCAE = true, CodigoAfip = 12, Activo = true }
         );
 
         m.Entity<MedioPago>().HasData(

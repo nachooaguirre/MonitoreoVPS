@@ -3,12 +3,17 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using SuperPOS.Client.Views.Compras;
 
 namespace SuperPOS.Client.Views.Remitos;
 
 public sealed class DetalleRemitoWindow : Window
 {
     private readonly int _idRemito;
+    private int _idProveedor;
+    private string _proveedorNombre = "";
+    private int _estado;
+    private readonly Button _btnConciliar;
     private readonly TextBlock _txtHeader = new()
     {
         FontSize = 14,
@@ -67,10 +72,18 @@ public sealed class DetalleRemitoWindow : Window
         Grid.SetRow(_dg, 1);
         grid.Children.Add(_dg);
 
-        var btnCerrar = new Button { Content = "Cerrar", Height = 36, Width = 120, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 0) };
+        var footer = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 0) };
+
+        _btnConciliar = new Button { Content = "Conciliar con Factura", Height = 36, Width = 160, Margin = new Thickness(0, 0, 8, 0), IsEnabled = false };
+        _btnConciliar.Click += async (_, _) => await ConciliarAsync();
+        footer.Children.Add(_btnConciliar);
+
+        var btnCerrar = new Button { Content = "Cerrar", Height = 36, Width = 120 };
         btnCerrar.Click += (_, _) => Close();
-        Grid.SetRow(btnCerrar, 2);
-        grid.Children.Add(btnCerrar);
+        footer.Children.Add(btnCerrar);
+
+        Grid.SetRow(footer, 2);
+        grid.Children.Add(footer);
 
         Content = grid;
         Loaded += async (_, _) => await CargarAsync();
@@ -94,6 +107,11 @@ public sealed class DetalleRemitoWindow : Window
             var prov = TryGetString(r, "proveedorNombre", "ProveedorNombre");
             var ext = TryGetString(r, "nroRemitoExterno", "NroRemitoExterno");
             var transp = TryGetString(r, "transportista", "Transportista");
+
+            _idProveedor = (int)TryGetDecimal(r, "idProveedor", "IdProveedor");
+            _proveedorNombre = prov ?? "";
+            _estado = (int)TryGetDecimal(r, "estado", "Estado");
+            _btnConciliar.IsEnabled = _idProveedor > 0 && _estado == 1; // EstadoRemito.Confirmado
 
             Title = $"Remito n° {JsonElementToDisplay(nro)}";
             _txtHeader.Text = $"{FmtFecha(fecha)} · Estado: {JsonElementToDisplay(est)} · {prov ?? "—"}" +
@@ -123,6 +141,43 @@ public sealed class DetalleRemitoWindow : Window
         {
             MessageBox.Show($"Error: {ex.Message}");
         }
+    }
+
+    private async Task ConciliarAsync()
+    {
+        var picker = new SeleccionarCompraWindow(_idProveedor) { Owner = this };
+        if (picker.ShowDialog() != true || picker.IdCompraSeleccionada is not { } idCompra) return;
+
+        try
+        {
+            var resultado = await App.Api.ConciliarRemitoConCompra(_idRemito, (int)idCompra);
+            var conciliada = resultado.TryGetProperty("conciliada", out var c) && c.GetBoolean();
+            if (conciliada)
+            {
+                MessageBox.Show("✅ Conciliado: la factura coincide con lo recibido. La compra queda habilitada para pago.");
+                return;
+            }
+
+            var diffs = resultado.GetProperty("diferencias");
+            var msg = "⚠ Se encontraron diferencias entre lo facturado y lo recibido:\n\n";
+            decimal totalDiferencia = 0;
+            foreach (var d in diffs.EnumerateArray())
+            {
+                var desc = TryGetString(d, "descripcion", "Descripcion") ?? $"Artículo {TryGetDecimal(d, "idArticulo", "IdArticulo")}";
+                var monto = TryGetDecimal(d, "montoDiferencia", "MontoDiferencia");
+                totalDiferencia += monto;
+                msg += $"• {desc}: facturado {TryGetDecimal(d, "cantidadFacturada", "CantidadFacturada")} vs. recibido {TryGetDecimal(d, "cantidadRecibida", "CantidadRecibida")} ({monto:C2})\n";
+            }
+            msg += $"\nDiferencia total: {totalDiferencia:C2}\n\n¿Registrar la Nota de Crédito/Débito del proveedor ahora?";
+
+            if (MessageBox.Show(msg, "Diferencias encontradas", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
+            {
+                var esDebito = totalDiferencia < 0;
+                var dlg = new NotaProveedorWindow(_idProveedor, _proveedorNombre, idCompra, Math.Abs(totalDiferencia), esDebito) { Owner = this };
+                dlg.ShowDialog();
+            }
+        }
+        catch (Exception ex) { MessageBox.Show($"Error: {ex.Message}"); }
     }
 
     private static string FmtFecha(JsonElement? el)

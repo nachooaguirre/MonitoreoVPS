@@ -50,6 +50,13 @@ public partial class ClientesPage : Page
         if (dlg.ShowDialog() == true) _ = CargarDatos();
     }
 
+    private void BtnNotaCliente_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as Button)?.Tag is not Cliente c) return;
+        var dlg = new NotaClienteWindow(c) { Owner = Window.GetWindow(this) };
+        dlg.ShowDialog();
+    }
+
     private async void BtnEliminar_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as Button)?.Tag is not Cliente c) return;
