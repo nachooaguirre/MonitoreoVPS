@@ -134,9 +134,9 @@
 
                     <!-- Formato de etiquetas -->
                     <TextBlock Text="Formato de Etiqueta:" Foreground="#8090A0" FontSize="12" Margin="0,0,0,6"/>
-                    <ComboBox x:Name="CmbFormato" Height="36" SelectedIndex="0" Margin="0,0,0,16">
+                    <ComboBox x:Name="CmbFormato" Height="36" SelectedIndex="1" Margin="0,0,0,16">
                         <ComboBoxItem Content="Góndola (60mm x 30mm)"/>
-                        <ComboBoxItem Content="Chica (50mm x 30mm)"/>
+                        <ComboBoxItem Content="Chica (50mm x 30mm) — estándar"/>
                         <ComboBoxItem Content="Grande (80mm x 40mm)"/>
                     </ComboBox>
 

@@ -233,8 +233,10 @@ namespace SuperPOS.Client.Views.Precios
             // Borde externo
             dc.DrawRectangle(null, new Pen(Brushes.Black, 1.5), new Rect(1, 1, _width - 2, _height - 2));
 
-            // Si es formato Góndola (60mm x 30mm) -> _width == 227
-            if (Math.Abs(_width - 227) < 5)
+            // El contenido completo (precio sin impuesto + precio por kilo/litro) se usa tanto en
+            // Góndola (60x30mm) como en Chica (50x30mm, el estándar de 5x3cm) — ambas comparten
+            // el mismo alto de 30mm; solo "Grande" (40mm de alto) usa el layout simple de abajo.
+            if (Math.Abs(_height - 113) < 5)
             {
                 RenderGondola(dc);
                 return;
@@ -424,7 +426,14 @@ namespace SuperPOS.Client.Views.Precios
             decimal contValor = _articulo?.ContenidoValor ?? 1m;
             string contUnidad = _articulo?.ContenidoUnidad ?? "UN";
 
-            if (contValor > 0 && contUnidad != "UN")
+            // Pesables (verdulería/carnicería/fiambrería, EAN que arranca con "20"): el precio
+            // cargado YA es por kilogramo, no hay que dividir por ningún contenido neto.
+            bool esPesable = _articulo?.EsPesable == true || (_articulo?.CodigoBarras?.StartsWith("20") ?? false);
+            if (esPesable)
+            {
+                valorReferenciaStr = $"Kilo: {precio:F2}";
+            }
+            else if (contValor > 0 && contUnidad != "UN")
             {
                 if (contUnidad == "G")
                 {
@@ -545,5 +554,6 @@ namespace SuperPOS.Client.Views.Precios
         public bool AplicaIva { get; set; } = true;
         public decimal ContenidoValor { get; set; } = 1m;
         public string ContenidoUnidad { get; set; } = "UN";
+        public bool EsPesable { get; set; }
     }
 }
