@@ -52,6 +52,22 @@ public class SucursalAdminDto
     public int CajasInactivas { get; set; }
 }
 
+public class RemitoListItemDto
+{
+    public int Id { get; set; }
+    public int NroRemito { get; set; }
+    public DateTime Fecha { get; set; }
+    public int Tipo { get; set; }
+    public int Estado { get; set; }
+    public string? NroRemitoExterno { get; set; }
+    public string? Transportista { get; set; }
+    public int? IdOrdenCompra { get; set; }
+    public int? IdCompra { get; set; }
+    public string? ProveedorNombre { get; set; }
+    public string? ClienteNombre { get; set; }
+    public int CantArticulos { get; set; }
+}
+
 public class SucursalSimpleDto
 {
     public int Id { get; set; }

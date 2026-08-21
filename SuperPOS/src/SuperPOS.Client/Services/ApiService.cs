@@ -902,16 +902,14 @@ public class ApiService
     }
 
     // === REMITOS ===
-    public async Task<List<dynamic>?> GetRemitos(int? tipo = null, int? estado = null, int? idProveedor = null)
+    public async Task<List<RemitoListItemDto>> GetRemitos(int? tipo = null, int? estado = null, int? idProveedor = null)
     {
         var url = "api/remitos?pageSize=200";
         if (tipo.HasValue) url += $"&tipo={tipo}";
         if (estado.HasValue) url += $"&estado={estado}";
         if (idProveedor.HasValue) url += $"&idProveedor={idProveedor}";
-        var resp = await _http.GetFromJsonAsync<JsonElement>(url, _json);
-        if (resp.ValueKind == JsonValueKind.Undefined) return null;
-        return resp.GetProperty("items").EnumerateArray()
-            .Select(e => (dynamic)e).ToList();
+        var resp = await _http.GetFromJsonAsync<PagedResult<RemitoListItemDto>>(url, _json);
+        return resp?.Items ?? [];
     }
 
     public async Task<JsonElement?> GetRemitoDetalle(int id)

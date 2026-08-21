@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using SuperPOS.Client.Models;
 
 namespace SuperPOS.Client.Views.Remitos;
 
@@ -44,9 +45,8 @@ public partial class RemitosPage : Page
 
     private void DgRemitos_DoubleClick(object sender, MouseButtonEventArgs e)
     {
-        if (DgRemitos.SelectedItem is not System.Text.Json.JsonElement r) return;
-        int id = Convert.ToInt32(r.GetProperty("id").GetInt32());
-        var dlg = new DetalleRemitoWindow(id);
+        if (DgRemitos.SelectedItem is not RemitoListItemDto r) return;
+        var dlg = new DetalleRemitoWindow(r.Id);
         dlg.ShowDialog();
         _ = CargarRemitos();
     }

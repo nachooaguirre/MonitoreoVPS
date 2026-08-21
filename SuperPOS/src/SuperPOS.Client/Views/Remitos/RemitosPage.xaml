@@ -107,8 +107,8 @@
                 <DataGridTextColumn Header="PROVEEDOR / CLIENTE" Width="*">
                     <DataGridTextColumn.Binding>
                         <MultiBinding StringFormat="{}{0}{1}">
-                            <Binding Path="Proveedor.RazonSocial" TargetNullValue=""/>
-                            <Binding Path="Cliente.RazonSocial" TargetNullValue=""/>
+                            <Binding Path="ProveedorNombre" TargetNullValue=""/>
+                            <Binding Path="ClienteNombre" TargetNullValue=""/>
                         </MultiBinding>
                     </DataGridTextColumn.Binding>
                 </DataGridTextColumn>
