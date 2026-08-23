@@ -20,6 +20,8 @@ LoginMarketNewAge*/
 appsettings.Development.json
 appsettings.Local.json
 appsettings.*.local.json
+.env
+.env.*
 
 # Android / Gradle (SuperPOS.Android)
 **/SuperPOS.Android/**/.gradle/
