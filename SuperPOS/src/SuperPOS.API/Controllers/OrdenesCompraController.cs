@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SuperPOS.API.Data;
@@ -170,47 +171,79 @@ public class OrdenesCompraController(SuperPOSDbContext db) : ControllerBase
         return Ok(oc);
     }
 
+    /// <summary>
+    /// Recepción escaneada desde el Zebra (Android): NO mueve stock ni cierra la OC directamente.
+    /// Genera un Remito de Entrada en estado Pendiente con lo escaneado, que un usuario en el WPF
+    /// debe revisar y confirmar (PUT /remitos/{id}/confirmar) para recién ahí mover stock y cerrar la OC.
+    /// Queda un registro único en Auditoría con el detalle completo de lo escaneado por ese usuario.
+    /// </summary>
     [HttpPut("{id}/recibir")]
     public async Task<IActionResult> Recibir(int id, [FromBody] RecibirOCRequest req)
     {
-        var oc = await db.OrdenesCompra.Include(o => o.Detalles).FirstOrDefaultAsync(o => o.Id == id);
+        var oc = await db.OrdenesCompra.Include(o => o.Detalles).ThenInclude(d => d.Articulo).FirstOrDefaultAsync(o => o.Id == id);
         if (oc is null) return NotFound();
+
+        var nroRemito = (await db.Remitos.Where(r => r.Tipo == TipoRemito.Entrada).MaxAsync(r => (int?)r.NroRemito) ?? 0) + 1;
+        var resumenEscaneo = new List<object>();
+        var detalles = new List<RemitoDetalle>();
 
         foreach (var item in req.Items)
         {
             var det = oc.Detalles.FirstOrDefault(d => d.IdArticulo == item.IdArticulo);
-            if (det != null)
+            var art = det?.Articulo ?? await db.Articulos.FindAsync(item.IdArticulo);
+            detalles.Add(new RemitoDetalle
             {
-                det.CantidadRecibida = item.CantidadRecibida;
-                det.ObservacionDiferencia = item.ObservacionDiferencia;
-            }
-            else
+                IdArticulo = item.IdArticulo,
+                CantidadRemitida = det?.CantidadPedida ?? 0,
+                CantidadRecibida = item.CantidadRecibida,
+                PrecioCosto = item.PrecioCosto > 0 ? item.PrecioCosto : (det?.PrecioCosto ?? (decimal)(art?.PrecioCosto ?? 0)),
+                Observaciones = item.ObservacionDiferencia
+            });
+            resumenEscaneo.Add(new
             {
-                // Articulo excedente: agregarlo con cantidad pedida = 0
-                var art = await db.Articulos.FindAsync(item.IdArticulo);
-                if (art != null)
-                {
-                    oc.Detalles.Add(new OrdenCompraDetalle
-                    {
-                        IdArticulo = item.IdArticulo,
-                        CantidadPedida = 0,
-                        CantidadRecibida = item.CantidadRecibida,
-                        PrecioCosto = item.PrecioCosto > 0 ? item.PrecioCosto : (decimal)art.PrecioCosto,
-                        AlicuotaIva = (decimal)art.AlicuotaIva,
-                        Subtotal = 0,
-                        ObservacionDiferencia = item.ObservacionDiferencia
-                    });
-                }
-            }
+                item.IdArticulo,
+                Descripcion = art?.Descripcion,
+                CantidadPedida = det?.CantidadPedida ?? 0,
+                CantidadEscaneada = item.CantidadRecibida,
+                item.ObservacionDiferencia
+            });
         }
 
-        oc.Estado = oc.Detalles.All(d => d.CantidadRecibida >= d.CantidadPedida)
-            ? EstadoOrdenCompra.Recibida : EstadoOrdenCompra.RecepcionParcial;
-        oc.FechaRecepcion = DateTime.UtcNow;
-        oc.IdUsuarioRecepcion = req.IdUsuario;
-
+        var remito = new Remito
+        {
+            NroRemito = nroRemito,
+            Tipo = TipoRemito.Entrada,
+            Fecha = DateTime.UtcNow,
+            IdProveedor = oc.IdProveedor,
+            IdOrdenCompra = id,
+            IdUsuario = req.IdUsuario,
+            Estado = EstadoRemito.Pendiente,
+            Observaciones = "Generado desde escaneo Zebra (Android) — pendiente de revisión y confirmación en caja.",
+            Detalles = detalles
+        };
+        db.Remitos.Add(remito);
         await db.SaveChangesAsync();
-        return Ok(oc);
+
+        var usuario = await db.Usuarios.FindAsync(req.IdUsuario);
+        db.AuditLogs.Add(new AuditLog
+        {
+            IdUsuario = req.IdUsuario,
+            NombreUsuario = usuario?.NombreCompleto,
+            Entidad = "Remito",
+            EntidadId = remito.Id.ToString(),
+            Accion = TipoAccionAuditoria.Creacion,
+            Descripcion = $"Escaneo Zebra finalizado: OC #{oc.NroOrden} -> Remito #{remito.NroRemito}, {detalles.Count} artículo(s) escaneados por {usuario?.NombreCompleto ?? $"usuario {req.IdUsuario}"}. Pendiente de confirmar en caja.",
+            CambiosJson = JsonSerializer.Serialize(resumenEscaneo)
+        });
+        await db.SaveChangesAsync();
+
+        return Ok(new
+        {
+            RemitoId = remito.Id,
+            remito.NroRemito,
+            CantArticulos = detalles.Count,
+            Mensaje = "Escaneo enviado. Pendiente de revisión y confirmación en caja — el stock aún no se actualizó."
+        });
     }
 
     [HttpPut("{id}/anular")]

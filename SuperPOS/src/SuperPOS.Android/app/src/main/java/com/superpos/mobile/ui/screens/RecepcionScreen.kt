@@ -225,10 +225,12 @@ fun RecepcionScreen(
                 if (response.isSuccessful) {
                     selectedOc = null
                     ocItems.clear()
-                    toastMessage = "¡Recepción finalizada con éxito! Stock ingresado."
+                    // El backend genera un Remito pendiente — el stock recién se actualiza cuando
+                    // se confirma desde el WPF en caja, no acá.
+                    toastMessage = "Escaneo enviado. Pendiente de revisión y confirmación en caja."
                     loadOpenOcs()
                 } else {
-                    errorMessage = "Error al confirmar: ${response.code()}"
+                    errorMessage = "Error al enviar el escaneo: ${response.code()}"
                 }
             } catch (e: Exception) {
                 errorMessage = "Error de red: ${e.message}"
