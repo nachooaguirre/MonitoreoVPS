@@ -166,7 +166,12 @@ public sealed class DetalleRemitoWindow : Window
                 var desc = TryGetString(d, "descripcion", "Descripcion") ?? $"Artículo {TryGetDecimal(d, "idArticulo", "IdArticulo")}";
                 var monto = TryGetDecimal(d, "montoDiferencia", "MontoDiferencia");
                 totalDiferencia += monto;
-                msg += $"• {desc}: facturado {TryGetDecimal(d, "cantidadFacturada", "CantidadFacturada")} vs. recibido {TryGetDecimal(d, "cantidadRecibida", "CantidadRecibida")} ({monto:C2})\n";
+                var difCant = TryGetDecimal(d, "diferenciaCantidad", "DiferenciaCantidad");
+                var difPrecio = TryGetDecimal(d, "diferenciaPrecioUnitario", "DiferenciaPrecioUnitario");
+                var detalle = new List<string>();
+                if (difCant != 0) detalle.Add($"cant. facturada {TryGetDecimal(d, "cantidadFacturada", "CantidadFacturada")} vs. recibida {TryGetDecimal(d, "cantidadRecibida", "CantidadRecibida")}");
+                if (difPrecio != 0) detalle.Add($"precio facturado {TryGetDecimal(d, "precioFacturado", "PrecioFacturado"):C2} vs. pactado {TryGetDecimal(d, "precioPactado", "PrecioPactado"):C2}");
+                msg += $"• {desc}: {string.Join(" | ", detalle)} ({monto:C2})\n";
             }
             msg += $"\nDiferencia total: {totalDiferencia:C2}\n\n¿Registrar la Nota de Crédito/Débito del proveedor ahora?";
 

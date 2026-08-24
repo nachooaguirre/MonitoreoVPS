@@ -204,7 +204,8 @@ public class OrdenesCompraController(SuperPOSDbContext db) : ControllerBase
             }
         }
 
-        oc.Estado = EstadoOrdenCompra.RecepcionParcial;
+        oc.Estado = oc.Detalles.All(d => d.CantidadRecibida >= d.CantidadPedida)
+            ? EstadoOrdenCompra.Recibida : EstadoOrdenCompra.RecepcionParcial;
         oc.FechaRecepcion = DateTime.UtcNow;
         oc.IdUsuarioRecepcion = req.IdUsuario;
 

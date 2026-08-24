@@ -292,20 +292,28 @@ public class RemitosController(SuperPOSDbContext db) : ControllerBase
             var rd = remito.Detalles.FirstOrDefault(d => d.IdArticulo == idArt);
             var facturado = cd?.Cantidad ?? 0;
             var recibido = rd?.CantidadRecibida ?? 0;
-            if (facturado == recibido) continue;
+            var precioFacturado = cd?.PrecioCostoNeto ?? 0;
+            // Precio pactado al generar la OC (lo que se acordó recibir); si no hay OC de por medio, no se puede comparar precio.
+            var precioPactado = rd?.PrecioCosto ?? precioFacturado;
+            var hayDifCantidad = facturado != recibido;
+            var hayDifPrecio = rd != null && precioPactado > 0 && precioFacturado != precioPactado;
+            if (!hayDifCantidad && !hayDifPrecio) continue;
 
             var art = await db.Articulos.FindAsync(idArt);
-            var precioCosto = cd?.PrecioCostoNeto ?? rd?.PrecioCosto ?? 0;
+            var montoDifCantidad = (facturado - recibido) * precioFacturado;
+            var montoDifPrecio = (precioFacturado - precioPactado) * facturado;
             diferencias.Add(new
             {
                 IdArticulo = idArt,
                 Descripcion = art?.Descripcion,
                 CantidadFacturada = facturado,
                 CantidadRecibida = recibido,
-                Diferencia = facturado - recibido,
-                PrecioCosto = precioCosto,
+                DiferenciaCantidad = facturado - recibido,
+                PrecioFacturado = precioFacturado,
+                PrecioPactado = precioPactado,
+                DiferenciaPrecioUnitario = precioFacturado - precioPactado,
                 AlicuotaIva = cd?.AlicuotaIva ?? 21,
-                MontoDiferencia = (facturado - recibido) * precioCosto
+                MontoDiferencia = montoDifCantidad + montoDifPrecio
             });
         }
 
