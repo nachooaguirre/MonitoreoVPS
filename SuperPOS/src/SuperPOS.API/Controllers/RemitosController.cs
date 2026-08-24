@@ -17,6 +17,7 @@ public class RemitosController(SuperPOSDbContext db) : ControllerBase
         [FromQuery] int? idProveedor,
         [FromQuery] DateTime? desde,
         [FromQuery] DateTime? hasta,
+        [FromQuery] bool? soloZebra,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50)
     {
@@ -26,6 +27,7 @@ public class RemitosController(SuperPOSDbContext db) : ControllerBase
         if (idProveedor.HasValue) q = q.Where(r => r.IdProveedor == idProveedor.Value);
         if (desde.HasValue) q = q.Where(r => r.Fecha >= desde.Value.ToUtc());
         if (hasta.HasValue) q = q.Where(r => r.Fecha <= hasta.Value.ToUtc().AddDays(1));
+        if (soloZebra == true) q = q.Where(r => r.GeneradoPorZebra);
 
         var total = await q.CountAsync();
         var items = await q.OrderByDescending(r => r.Fecha)
@@ -41,6 +43,7 @@ public class RemitosController(SuperPOSDbContext db) : ControllerBase
                 r.Transportista,
                 r.IdOrdenCompra,
                 r.IdCompra,
+                r.GeneradoPorZebra,
                 ProveedorNombre = r.Proveedor != null ? r.Proveedor.RazonSocial : null,
                 ClienteNombre   = r.Cliente  != null ? r.Cliente.RazonSocial  : null,
                 CantArticulos   = r.Detalles.Count

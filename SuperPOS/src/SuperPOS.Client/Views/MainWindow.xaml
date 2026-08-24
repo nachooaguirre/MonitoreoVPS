@@ -198,6 +198,7 @@
                             <Button x:Name="BtnTarifasProveedor" Content="📑  Listas de precio"  Style="{StaticResource NavBtn}" Tag="tarifasproveedor" Click="NavButton_Click"/>
                             <Button x:Name="BtnEtiquetas"     Content="🏷️  Imprimir Etiquetas" Style="{StaticResource NavBtn}" Tag="etiquetas"     Click="NavButton_Click"/>
                             <Button x:Name="BtnRemitos"       Content="📄  Remitos"            Style="{StaticResource NavBtn}" Tag="remitos"        Click="NavButton_Click"/>
+                            <Button x:Name="BtnRemitosZebra"  Content="📱  Escaneos Zebra"     Style="{StaticResource NavBtn}" Tag="remitoszebra"   Click="NavButton_Click"/>
                             <Button x:Name="BtnInventario"    Content="🔍  Inventario Físico"  Style="{StaticResource NavBtn}" Tag="inventario"     Click="NavButton_Click"/>
                             <Button x:Name="BtnStock"         Content="📊  Stock"              Style="{StaticResource NavBtn}" Tag="stock"         Click="NavButton_Click"/>
                             <Button x:Name="BtnTrazabilidad"  Content="🔍  Trazabilidad"       Style="{StaticResource NavBtn}" Tag="trazabilidad"  Click="NavButton_Click"/>

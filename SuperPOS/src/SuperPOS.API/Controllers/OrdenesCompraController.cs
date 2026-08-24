@@ -218,6 +218,7 @@ public class OrdenesCompraController(SuperPOSDbContext db) : ControllerBase
             IdOrdenCompra = id,
             IdUsuario = req.IdUsuario,
             Estado = EstadoRemito.Pendiente,
+            GeneradoPorZebra = true,
             Observaciones = "Generado desde escaneo Zebra (Android) — pendiente de revisión y confirmación en caja.",
             Detalles = detalles
         };

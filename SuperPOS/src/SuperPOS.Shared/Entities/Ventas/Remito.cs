@@ -21,6 +21,8 @@ public class Remito
     public string? Transportista { get; set; }
     public string? Observaciones { get; set; }
     public EstadoRemito Estado { get; set; } = EstadoRemito.Pendiente;
+    /// <summary>True si se generó desde el escaneo de un Zebra (Android) — pendiente de revisión en caja antes de confirmar.</summary>
+    public bool GeneradoPorZebra { get; set; }
 
     public Proveedor? Proveedor { get; set; }
     public Cliente? Cliente { get; set; }

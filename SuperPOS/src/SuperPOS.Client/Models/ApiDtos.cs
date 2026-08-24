@@ -66,6 +66,7 @@ public class RemitoListItemDto
     public string? ProveedorNombre { get; set; }
     public string? ClienteNombre { get; set; }
     public int CantArticulos { get; set; }
+    public bool GeneradoPorZebra { get; set; }
 }
 
 public class SucursalSimpleDto

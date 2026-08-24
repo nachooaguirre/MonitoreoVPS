@@ -909,12 +909,13 @@ public class ApiService
     }
 
     // === REMITOS ===
-    public async Task<List<RemitoListItemDto>> GetRemitos(int? tipo = null, int? estado = null, int? idProveedor = null)
+    public async Task<List<RemitoListItemDto>> GetRemitos(int? tipo = null, int? estado = null, int? idProveedor = null, bool? soloZebra = null)
     {
         var url = "api/remitos?pageSize=200";
         if (tipo.HasValue) url += $"&tipo={tipo}";
         if (estado.HasValue) url += $"&estado={estado}";
         if (idProveedor.HasValue) url += $"&idProveedor={idProveedor}";
+        if (soloZebra.HasValue) url += $"&soloZebra={soloZebra}";
         var resp = await _http.GetFromJsonAsync<PagedResult<RemitoListItemDto>>(url, _json);
         return resp?.Items ?? [];
     }
