@@ -195,6 +195,7 @@
 
                             <TextBlock Style="{StaticResource NavSection}" Text="INVENTARIO"/>
                             <Button x:Name="BtnOrdenesCompra" Content="📋  Órdenes Compra"    Style="{StaticResource NavBtn}" Tag="ordenescompra"  Click="NavButton_Click"/>
+                            <Button x:Name="BtnCompras"       Content="🧾  Facturas Proveedor" Style="{StaticResource NavBtn}" Tag="compras"        Click="NavButton_Click"/>
                             <Button x:Name="BtnTarifasProveedor" Content="📑  Listas de precio"  Style="{StaticResource NavBtn}" Tag="tarifasproveedor" Click="NavButton_Click"/>
                             <Button x:Name="BtnEtiquetas"     Content="🏷️  Imprimir Etiquetas" Style="{StaticResource NavBtn}" Tag="etiquetas"     Click="NavButton_Click"/>
                             <Button x:Name="BtnRemitos"       Content="📄  Remitos"            Style="{StaticResource NavBtn}" Tag="remitos"        Click="NavButton_Click"/>

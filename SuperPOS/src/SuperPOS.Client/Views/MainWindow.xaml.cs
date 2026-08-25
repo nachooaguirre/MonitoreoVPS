@@ -219,6 +219,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         BtnProveedores.IsEnabled   = p.AccesoProveedores || p.EsAdministrador;
         BtnPresupuestos.IsEnabled  = p.AccesoCaja || p.AccesoClientes || p.EsAdministrador;
         BtnOrdenesCompra.IsEnabled    = p.AccesoCompras || p.EsAdministrador;
+        BtnCompras.IsEnabled          = p.AccesoCompras || p.EsAdministrador;
         BtnTarifasProveedor.IsEnabled = p.AccesoCompras || p.EsAdministrador;
         BtnEtiquetas.IsEnabled        = p.AccesoStock || p.AccesoArticulos || p.EsAdministrador;
         BtnRemitos.IsEnabled          = p.AccesoCompras || p.EsAdministrador;
@@ -264,6 +265,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
             "tarifasproveedor" => new ListasPrecioProveedorPage(),
             "etiquetas"       => new EtiquetasGondolaPage(),
             "remitos"         => new RemitosPage(),
+            "compras"         => new ComprasPage(),
             "remitoszebra"    => new RemitosZebraPage(),
             "tesoreria"     => new TesoreriaPage(),
             "inventario"    => new InventarioPage(),

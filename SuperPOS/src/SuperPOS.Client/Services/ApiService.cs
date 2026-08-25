@@ -948,6 +948,45 @@ public class ApiService
         return resp?.Items ?? [];
     }
 
+    public async Task<Compra> CrearCompra(Compra compra)
+    {
+        var r = await _http.PostAsJsonAsync("api/compras", compra, _json);
+        if (!r.IsSuccessStatusCode)
+        {
+            var err = await r.Content.ReadAsStringAsync();
+            throw new InvalidOperationException(err.Length > 300 ? err[..300] : err);
+        }
+        return (await r.Content.ReadFromJsonAsync<Compra>(_json))!;
+    }
+
+    public async Task SubirFacturaArchivo(long idCompra, string rutaArchivo)
+    {
+        var bytes = await File.ReadAllBytesAsync(rutaArchivo);
+        using var form = new MultipartFormDataContent();
+        var fileContent = new ByteArrayContent(bytes);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        form.Add(fileContent, "file", Path.GetFileName(rutaArchivo));
+        var r = await _http.PostAsync($"api/compras/{idCompra}/factura-archivo", form);
+        if (!r.IsSuccessStatusCode)
+        {
+            var err = await r.Content.ReadAsStringAsync();
+            throw new InvalidOperationException(err.Length > 300 ? err[..300] : err);
+        }
+    }
+
+    /// <summary>Descarga el archivo adjunto de una factura. La API exige JWT, así que no se puede abrir
+    /// la URL directo en el navegador — hay que bajarlo con este cliente autenticado y guardarlo local.</summary>
+    public async Task<(byte[] Bytes, string FileName)?> DescargarFacturaArchivo(long idCompra)
+    {
+        var r = await _http.GetAsync($"api/compras/{idCompra}/factura-archivo");
+        if (!r.IsSuccessStatusCode) return null;
+        var bytes = await r.Content.ReadAsByteArrayAsync();
+        var fileName = r.Content.Headers.ContentDisposition?.FileNameStar
+            ?? r.Content.Headers.ContentDisposition?.FileName?.Trim('"')
+            ?? $"factura-{idCompra}";
+        return (bytes, fileName);
+    }
+
     public async Task<JsonElement> ConciliarRemitoConCompra(int idRemito, int idCompra)
     {
         var r = await _http.PutAsync($"api/remitos/{idRemito}/conciliar/{idCompra}", null);

@@ -30,6 +30,9 @@ public class Compra
     public bool Pagada { get; set; }
     /// <summary>False si la conciliación remito↔factura encontró diferencias sin resolver (ver RemitosController.ConciliarConCompra) — bloquea el pago hasta emitir la Nota de Crédito/Débito correspondiente.</summary>
     public bool Conciliada { get; set; } = true;
+    /// <summary>Nombre original del PDF/foto de la factura del proveedor adjuntado (ver ComprasController.SubirFacturaArchivo).</summary>
+    public string? ArchivoFacturaNombre { get; set; }
+    public string? ArchivoFacturaRutaRelativa { get; set; }
 
     public Proveedor? Proveedor { get; set; }
     public TipoComprobante? TipoComprobante { get; set; }

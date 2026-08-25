@@ -1,0 +1,98 @@
+<Page x:Class="SuperPOS.Client.Views.Compras.ComprasPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Facturas de Proveedor" Background="#141414">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="#1A1A1A" Padding="20,14" BorderThickness="0,0,0,1" BorderBrush="#2A2A2A">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="🧾" FontSize="24" Margin="0,0,12,0"/>
+                    <StackPanel>
+                        <TextBlock Text="Facturas de Proveedor" FontSize="20" FontWeight="Bold" Foreground="#F0F0F0"/>
+                        <TextBlock Text="Compras cargadas — conciliar contra remitos antes de pagar" FontSize="11" Foreground="#607080"/>
+                    </StackPanel>
+                </StackPanel>
+                <Button Grid.Column="1" Content="+ Nueva Factura" Height="36" Padding="16,0" Click="BtnNuevaFactura_Click"/>
+            </Grid>
+        </Border>
+
+        <!-- Filtros -->
+        <Border Grid.Row="1" Background="#1E1E1E" Padding="14,10" Margin="16,12,16,0" CornerRadius="8">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Estado:" Foreground="#809090" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <ComboBox x:Name="CboEstado" Width="140" Height="32" SelectionChanged="Filtrar_Changed"
+                          Foreground="#F0F0F0" Background="#2A2A2A">
+                    <ComboBoxItem Content="Todos" IsSelected="True"/>
+                    <ComboBoxItem Content="Pendiente"/>
+                    <ComboBoxItem Content="Recibida"/>
+                    <ComboBoxItem Content="Anulada"/>
+                </ComboBox>
+                <Button Content="🔄" Height="32" Width="36" Margin="8,0,0,0" Click="BtnRefresh_Click"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Tabla -->
+        <DataGrid x:Name="DgCompras" Grid.Row="2" Margin="16,12,16,0"
+                  AutoGenerateColumns="False" IsReadOnly="True"
+                  Background="#141414" Foreground="#D0D8E0" FontSize="13"
+                  RowBackground="#1A1A1A" AlternatingRowBackground="#1E1E1E"
+                  HorizontalGridLinesBrush="#2A2A2A" BorderThickness="0" RowHeight="40"
+                  SelectionMode="Single" MouseDoubleClick="DgCompras_DoubleClick">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="FACTURA" Width="120">
+                    <DataGridTextColumn.Binding>
+                        <MultiBinding StringFormat="{}{0}-{1}">
+                            <Binding Path="LetraFactura"/>
+                            <Binding Path="NumeroFactura"/>
+                        </MultiBinding>
+                    </DataGridTextColumn.Binding>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="FECHA" Binding="{Binding Fecha, StringFormat='dd/MM/yyyy'}" Width="100"/>
+                <DataGridTextColumn Header="PROVEEDOR" Binding="{Binding Proveedor.RazonSocial}" Width="*"/>
+                <DataGridTextColumn Header="TOTAL" Binding="{Binding Total, StringFormat='C2'}" Width="110"/>
+                <DataGridTextColumn Header="VENCIMIENTO" Binding="{Binding FechaVencimiento, StringFormat='dd/MM/yyyy'}" Width="110"/>
+                <DataGridCheckBoxColumn Header="CONCILIADA" Binding="{Binding Conciliada}" Width="90"/>
+                <DataGridCheckBoxColumn Header="PAGADA" Binding="{Binding Pagada}" Width="80"/>
+                <DataGridTemplateColumn Header="FACTURA ADJUNTA" Width="130">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="📎 Ver archivo" Foreground="#60A0C0" Cursor="Hand"
+                                       MouseLeftButtonUp="VerArchivo_Click" Margin="8,0">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ArchivoFacturaNombre}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- Footer -->
+        <Border Grid.Row="3" Background="#1A1A1A" Padding="16,8" Margin="16,8,16,0" CornerRadius="6">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Doble clic para ver el detalle" FontSize="11" Foreground="#506070"/>
+                <TextBlock x:Name="TxtTotal" FontSize="12" Foreground="#60A0C0" FontWeight="Bold" Margin="20,0,0,0"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Page>

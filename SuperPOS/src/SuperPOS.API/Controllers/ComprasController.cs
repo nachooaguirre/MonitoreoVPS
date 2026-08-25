@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using SuperPOS.API.Data;
 using SuperPOS.API.Helpers;
@@ -8,7 +9,7 @@ namespace SuperPOS.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class ComprasController(SuperPOSDbContext db) : ControllerBase
+public class ComprasController(SuperPOSDbContext db, IWebHostEnvironment env) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] DateTime? desde, [FromQuery] DateTime? hasta,
@@ -37,7 +38,7 @@ public class ComprasController(SuperPOSDbContext db) : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Crear([FromBody] Compra compra)
     {
-        compra.Fecha = DateTime.UtcNow;
+        compra.Fecha = compra.Fecha == default ? DateTime.UtcNow : compra.Fecha.ToUtc();
         compra.Estado = EstadoCompra.Pendiente;
         foreach (var det in compra.Detalles)
         {
@@ -154,5 +155,51 @@ public class ComprasController(SuperPOSDbContext db) : ControllerBase
         compra.Estado = EstadoCompra.Anulada;
         await db.SaveChangesAsync();
         return NoContent();
+    }
+
+    /// <summary>Adjunta (o reemplaza) el PDF/foto de la factura real del proveedor a una Compra ya cargada.</summary>
+    [HttpPost("{id}/factura-archivo")]
+    [RequestSizeLimit(20_000_000)]
+    public async Task<IActionResult> SubirFacturaArchivo(long id, IFormFile file, CancellationToken ct)
+    {
+        var compra = await db.Compras.FindAsync([id], ct);
+        if (compra is null) return NotFound();
+        if (file is not { Length: > 0 }) return BadRequest(new { error = "Adjuntá un archivo." });
+
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        var dir = Path.Combine(env.ContentRootPath, "Data", "uploads", "facturas-compra");
+        Directory.CreateDirectory(dir);
+
+        // Si ya tenía un archivo adjunto, se reemplaza (se borra el anterior).
+        if (!string.IsNullOrEmpty(compra.ArchivoFacturaRutaRelativa))
+        {
+            var anterior = Path.Combine(env.ContentRootPath, compra.ArchivoFacturaRutaRelativa.Replace("/", Path.DirectorySeparatorChar.ToString()));
+            if (System.IO.File.Exists(anterior)) System.IO.File.Delete(anterior);
+        }
+
+        var safeName = $"{Guid.NewGuid():N}{ext}";
+        var rel = Path.Combine("Data", "uploads", "facturas-compra", safeName);
+        var full = Path.Combine(env.ContentRootPath, rel);
+        await using (var fs = System.IO.File.Create(full))
+            await file.CopyToAsync(fs, ct);
+
+        compra.ArchivoFacturaNombre = file.FileName;
+        compra.ArchivoFacturaRutaRelativa = rel.Replace("\\", "/");
+        await db.SaveChangesAsync(ct);
+
+        return Ok(new { compra.ArchivoFacturaNombre });
+    }
+
+    [HttpGet("{id}/factura-archivo")]
+    public async Task<IActionResult> DescargarFacturaArchivo(long id)
+    {
+        var compra = await db.Compras.FindAsync(id);
+        if (compra?.ArchivoFacturaRutaRelativa is null) return NotFound();
+
+        var full = Path.Combine(env.ContentRootPath, compra.ArchivoFacturaRutaRelativa.Replace("/", Path.DirectorySeparatorChar.ToString()));
+        if (!System.IO.File.Exists(full)) return NotFound();
+
+        new FileExtensionContentTypeProvider().TryGetContentType(full, out var mime);
+        return PhysicalFile(full, mime ?? "application/octet-stream", compra.ArchivoFacturaNombre ?? Path.GetFileName(full));
     }
 }

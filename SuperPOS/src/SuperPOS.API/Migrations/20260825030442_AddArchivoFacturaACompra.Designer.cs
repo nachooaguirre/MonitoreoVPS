@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SuperPOS.API.Data;
@@ -11,9 +12,11 @@ using SuperPOS.API.Data;
 namespace SuperPOS.API.Migrations
 {
     [DbContext(typeof(SuperPOSDbContext))]
-    partial class SuperPOSDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260825030442_AddArchivoFacturaACompra")]
+    partial class AddArchivoFacturaACompra
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
