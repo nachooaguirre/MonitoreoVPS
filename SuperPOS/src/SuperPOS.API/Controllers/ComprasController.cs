@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
@@ -201,5 +202,157 @@ public class ComprasController(SuperPOSDbContext db, IWebHostEnvironment env) : 
 
         new FileExtensionContentTypeProvider().TryGetContentType(full, out var mime);
         return PhysicalFile(full, mime ?? "application/octet-stream", compra.ArchivoFacturaNombre ?? Path.GetFileName(full));
+    }
+
+    /// <summary>
+    /// Importa en lote las facturas de compra desde el CSV que se descarga del Portal IVA de AFIP
+    /// ("Mis Comprobantes" &gt; Comprobantes recibidos &gt; Descargar comprobantes,
+    /// nombre de archivo tipo comprobantes_periodo_aaaamm_compras_aaaammdd_nnnn.csv).
+    /// Es la misma idea que ya tenía Gecom: conciliar contra lo que el proveedor declaró ante AFIP,
+    /// en vez de cargar cada factura a mano. Formato semicolon-separated con encabezado en español.
+    /// </summary>
+    [HttpPost("importar-portal-iva")]
+    [RequestSizeLimit(20_000_000)]
+    public async Task<IActionResult> ImportarPortalIva(IFormFile file, CancellationToken ct)
+    {
+        if (file is not { Length: > 0 }) return BadRequest(new { error = "Adjuntá el CSV descargado del Portal IVA de AFIP." });
+
+        using var reader = new StreamReader(file.OpenReadStream(), System.Text.Encoding.UTF8);
+        var headerLine = await reader.ReadLineAsync(ct);
+        if (headerLine is null) return BadRequest(new { error = "El archivo está vacío." });
+
+        var headers = headerLine.Split(';').Select(h => h.Trim().Trim('"')).ToList();
+        int Col(string nombre)
+        {
+            var idx = headers.FindIndex(h => string.Equals(h, nombre, StringComparison.OrdinalIgnoreCase));
+            return idx;
+        }
+
+        var colFecha = Col("Fecha de Emisión");
+        var colTipo = Col("Tipo de Comprobante");
+        var colPtoVta = Col("Punto de Venta");
+        var colNroDesde = Col("Número Desde");
+        var colTipoDocEmisor = Col("Tipo Doc. Emisor");
+        var colNroDocEmisor = Col("Nro. Doc. Emisor");
+        var colDenomEmisor = Col("Denominación Emisor");
+        var colNetoGravado = Col("Imp. Neto Gravado");
+        var colNetoNoGravado = Col("Imp. Neto No Gravado");
+        var colExentas = Col("Imp. Op. Exentas");
+        var colOtrosTributos = Col("Otros Tributos");
+        var colIva = Col("IVA");
+        var colTotal = Col("Imp. Total");
+
+        var columnasFaltantes = new[]
+        {
+            ("Fecha de Emisión", colFecha), ("Tipo de Comprobante", colTipo), ("Punto de Venta", colPtoVta),
+            ("Número Desde", colNroDesde), ("Nro. Doc. Emisor", colNroDocEmisor), ("Imp. Total", colTotal)
+        }.Where(c => c.Item2 < 0).Select(c => c.Item1).ToList();
+        if (columnasFaltantes.Count > 0)
+            return UnprocessableEntity(new
+            {
+                error = "El archivo no tiene el formato esperado del Portal IVA de AFIP.",
+                columnasFaltantes,
+                columnasEncontradas = headers
+            });
+
+        var cultura = CultureInfo.GetCultureInfo("es-AR");
+        decimal ParseImporte(string[] campos, int col) =>
+            col >= 0 && col < campos.Length && decimal.TryParse(campos[col].Trim(), NumberStyles.Number, cultura, out var v) ? v : 0;
+
+        var errores = new List<object>();
+        var creadas = new List<Compra>();
+        var nroFila = 1;
+
+        while (await reader.ReadLineAsync(ct) is { } linea)
+        {
+            nroFila++;
+            if (string.IsNullOrWhiteSpace(linea)) continue;
+            var campos = linea.Split(';').Select(c => c.Trim().Trim('"')).ToArray();
+
+            try
+            {
+                var cuitEmisor = campos[colNroDocEmisor].Trim();
+                var proveedor = await db.Proveedores.FirstOrDefaultAsync(p => p.Cuit == cuitEmisor, ct);
+                if (proveedor is null)
+                {
+                    errores.Add(new { fila = nroFila, motivo = $"No existe un proveedor cargado con CUIT {cuitEmisor}" +
+                        (colDenomEmisor >= 0 ? $" ({campos[colDenomEmisor]})" : "") });
+                    continue;
+                }
+
+                if (!int.TryParse(campos[colTipo].Trim(), out var codigoAfipTipo))
+                {
+                    errores.Add(new { fila = nroFila, motivo = $"Tipo de comprobante inválido: '{campos[colTipo]}'" });
+                    continue;
+                }
+                var tipoCbte = await db.TiposComprobante.FirstOrDefaultAsync(t => t.CodigoAfip == codigoAfipTipo, ct);
+                if (tipoCbte is null)
+                {
+                    errores.Add(new { fila = nroFila, motivo = $"No se reconoce el tipo de comprobante AFIP código {codigoAfipTipo}" });
+                    continue;
+                }
+
+                if (!DateTime.TryParseExact(campos[colFecha].Trim(), "dd/MM/yyyy", cultura, DateTimeStyles.None, out var fecha))
+                {
+                    errores.Add(new { fila = nroFila, motivo = $"Fecha inválida: '{campos[colFecha]}'" });
+                    continue;
+                }
+
+                var neto = ParseImporte(campos, colNetoGravado);
+                var noGravado = ParseImporte(campos, colNetoNoGravado);
+                var exento = ParseImporte(campos, colExentas);
+                var otrosTributos = ParseImporte(campos, colOtrosTributos);
+                var iva = ParseImporte(campos, colIva);
+                // El total lo recalculamos en base a la suma de importes, igual que hace Gecom, porque el
+                // "Imp. Total" que provee AFIP a veces difiere levemente de la suma real de detalle+impuestos.
+                var totalCalculado = neto + noGravado + exento + otrosTributos + iva;
+
+                var yaExiste = await db.Compras.AnyAsync(c =>
+                    c.IdProveedor == proveedor.Id && c.IdTipoComprobante == tipoCbte.Id &&
+                    c.NumeroFactura == campos[colNroDesde].Trim() && c.PuntoVentaProveedor.ToString() == campos[colPtoVta].Trim(), ct);
+                if (yaExiste)
+                {
+                    errores.Add(new { fila = nroFila, motivo = $"Ya existe una compra cargada para esta factura (proveedor {proveedor.RazonSocial}, {campos[colNroDesde]})" });
+                    continue;
+                }
+
+                var compra = new Compra
+                {
+                    IdProveedor = proveedor.Id,
+                    Fecha = fecha.ToUtc(),
+                    NumeroFactura = campos[colNroDesde].Trim(),
+                    LetraFactura = tipoCbte.Nombre.Trim().Split(' ').Last(),
+                    IdTipoComprobante = tipoCbte.Id,
+                    PuntoVentaProveedor = int.TryParse(campos[colPtoVta].Trim(), out var pv) ? pv : 0,
+                    Estado = EstadoCompra.Pendiente,
+                    SubTotal = neto + noGravado + exento,
+                    TotalIva = iva,
+                    ImporteNoGravado = noGravado,
+                    ImporteExento = exento,
+                    Total = totalCalculado,
+                    Observaciones = "Importada desde Portal IVA AFIP"
+                };
+                var vencProveedor = proveedor.DiasVencimientoPago;
+                compra.FechaVencimiento = compra.Fecha.AddDays(vencProveedor);
+
+                db.Compras.Add(compra);
+                creadas.Add(compra);
+            }
+            catch (Exception ex)
+            {
+                errores.Add(new { fila = nroFila, motivo = $"Error al procesar la fila: {ex.Message}" });
+            }
+        }
+
+        await db.SaveChangesAsync(ct);
+
+        return Ok(new
+        {
+            totalFilas = nroFila - 1,
+            importadas = creadas.Count,
+            errores.Count,
+            errores,
+            compras = creadas.Select(c => new { c.Id, c.NumeroFactura, c.LetraFactura, c.Total })
+        });
     }
 }

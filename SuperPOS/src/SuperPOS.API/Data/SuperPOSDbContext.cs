@@ -48,6 +48,12 @@ public class SuperPOSDbContext(DbContextOptions<SuperPOSDbContext> options, IHtt
     public DbSet<Inventario> Inventarios => Set<Inventario>();
     public DbSet<InventarioDetalle> InventariosDetalle => Set<InventarioDetalle>();
     public DbSet<Remito> Remitos => Set<Remito>();
+    public DbSet<AfipRemitoCarneGrupo> AfipRemitoCarneGrupos => Set<AfipRemitoCarneGrupo>();
+    public DbSet<AfipRemitoCarneTipo> AfipRemitoCarneTipos => Set<AfipRemitoCarneTipo>();
+    public DbSet<AfipRemitoHarinaTipo> AfipRemitoHarinaTipos => Set<AfipRemitoHarinaTipo>();
+    public DbSet<AfipRemitoHarinaEmbalaje> AfipRemitoHarinaEmbalajes => Set<AfipRemitoHarinaEmbalaje>();
+    public DbSet<BancoArgentino> BancosArgentina => Set<BancoArgentino>();
+    public DbSet<SicoreRegimenConcepto> SicoreRegimenesConcepto => Set<SicoreRegimenConcepto>();
     public DbSet<RemitoDetalle> RemitosDetalle => Set<RemitoDetalle>();
     public DbSet<ArticuloStockSucursal> ArticulosStockPorSucursal => Set<ArticuloStockSucursal>();
     public DbSet<TransferenciaInterna> TransferenciasInternas => Set<TransferenciaInterna>();
@@ -626,6 +632,21 @@ public class SuperPOSDbContext(DbContextOptions<SuperPOSDbContext> options, IHtt
             e.HasOne(x => x.Cliente).WithMany().HasForeignKey(x => x.IdCliente).OnDelete(DeleteBehavior.Restrict);
             e.HasMany(x => x.Detalles).WithOne(d => d.Remito).HasForeignKey(d => d.IdRemito).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(x => new { x.Tipo, x.NroRemito }).IsUnique();
+        });
+
+        m.Entity<AfipRemitoCarneGrupo>(e => e.HasKey(x => x.Id));
+        m.Entity<AfipRemitoCarneTipo>(e =>
+        {
+            e.HasKey(x => x.Codigo);
+            e.HasOne(x => x.Grupo).WithMany().HasForeignKey(x => x.IdGrupo).OnDelete(DeleteBehavior.Restrict);
+        });
+        m.Entity<AfipRemitoHarinaTipo>(e => e.HasKey(x => x.Id));
+        m.Entity<AfipRemitoHarinaEmbalaje>(e => e.HasKey(x => x.Id));
+        m.Entity<BancoArgentino>(e => e.HasKey(x => x.CodigoBcra));
+        m.Entity<SicoreRegimenConcepto>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.CodigoRegimen, x.CodigoConcepto, x.Subcodigo }).IsUnique();
         });
 
         m.Entity<RemitoDetalle>(e =>

@@ -37,3 +37,6 @@ appsettings.*.local.json
 
 # Datos reales del cliente (CUIT, ventas, compras) usados para validar el exportador contable
 documentos_contabilidad/
+
+# Copia local del sistema legacy Gecom del cliente (ejecutables, datos historicos) — solo para relevamiento
+gecom/
