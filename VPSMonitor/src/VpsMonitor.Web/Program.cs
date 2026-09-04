@@ -49,10 +49,11 @@ public static class VpsMonitorApp
         builder.Services.AddScoped<VpsMonitor.Web.Infrastructure.Notifications.IEmailNotificationService, VpsMonitor.Web.Infrastructure.Notifications.EmailNotificationService>();
 
         var aiBaseUrl = builder.Configuration["Ai:BaseUrl"] ?? "https://integrate.api.nvidia.com/v1";
-        var normalizedAiUrl = aiBaseUrl.TrimEnd('/') + "/";
+        var normalizedAiUri = NormalizeAiBaseUrl(aiBaseUrl);
+
         builder.Services.AddHttpClient<VpsMonitor.Web.Infrastructure.Ai.IAiDiagnosticsClient, VpsMonitor.Web.Infrastructure.Ai.AiDiagnosticsClient>(client =>
         {
-            client.BaseAddress = new Uri(normalizedAiUrl);
+            client.BaseAddress = normalizedAiUri;
             client.Timeout = TimeSpan.FromSeconds(25);
             var apiKey = builder.Configuration["Ai:ApiKey"];
             if (!string.IsNullOrWhiteSpace(apiKey))
@@ -63,7 +64,7 @@ public static class VpsMonitorApp
 
         builder.Services.AddHttpClient<VpsMonitor.Web.Infrastructure.Ai.IAiProjectPlannerService, VpsMonitor.Web.Infrastructure.Ai.AiProjectPlannerService>(client =>
         {
-            client.BaseAddress = new Uri(normalizedAiUrl);
+            client.BaseAddress = normalizedAiUri;
             client.Timeout = TimeSpan.FromSeconds(30);
             var apiKey = builder.Configuration["Ai:ApiKey"];
             if (!string.IsNullOrWhiteSpace(apiKey))
@@ -212,6 +213,34 @@ public static class VpsMonitorApp
             CreatedAtUtc = TimeProvider.System.GetUtcNow().UtcDateTime
         });
         await db.SaveChangesAsync();
+    }
+
+    public static Uri NormalizeAiBaseUrl(string inputUrl)
+    {
+        if (string.IsNullOrWhiteSpace(inputUrl))
+        {
+            inputUrl = "https://integrate.api.nvidia.com/v1/";
+        }
+
+        var trimmed = inputUrl.Trim();
+        if (trimmed.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase))
+        {
+            trimmed = trimmed[..^"/chat/completions".Length];
+        }
+        else if (trimmed.EndsWith("/chat/completions/", StringComparison.OrdinalIgnoreCase))
+        {
+            trimmed = trimmed[..^"/chat/completions/".Length];
+        }
+
+        trimmed = trimmed.TrimEnd('/');
+
+        if (!trimmed.EndsWith("/v1", StringComparison.OrdinalIgnoreCase) &&
+            !trimmed.Contains("/v1/", StringComparison.OrdinalIgnoreCase))
+        {
+            trimmed += "/v1";
+        }
+
+        return new Uri(trimmed + "/");
     }
 
     public sealed record BuildInfo(string ApplicationVersion, string BuildCommit);

@@ -110,6 +110,14 @@ public sealed class AiDiagnosticsClient : IAiDiagnosticsClient
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("AI Chat request to {Uri} failed with status code {StatusCode}", response.RequestMessage?.RequestUri, response.StatusCode);
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized || response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                {
+                    return "⚠️ **Error de Autenticación de IA**: La API Key de NVIDIA es requerida o inválida. Por favor, configura `AI_API_KEY=nvapi-...` en tu archivo `deploy/.env` y reinicia el gateway.";
+                }
+                if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    return $"⚠️ **Error 404 de IA**: La ruta de la API `{response.RequestMessage?.RequestUri}` no fue encontrada. Revisa `AI_BASE_URL` en tu archivo `deploy/.env`.";
+                }
                 return $"Error de conexión con la IA (Status {response.StatusCode}). Por favor reintenta en unos instantes.";
             }
 
