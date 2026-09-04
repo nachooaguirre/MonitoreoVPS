@@ -60,6 +60,22 @@ public static class VpsMonitorApp
             }
         });
 
+        builder.Services.AddHttpClient<VpsMonitor.Web.Infrastructure.Ai.IAiProjectPlannerService, VpsMonitor.Web.Infrastructure.Ai.AiProjectPlannerService>(client =>
+        {
+            client.BaseAddress = new Uri(aiBaseUrl.EndsWith('/') ? aiBaseUrl : $"{aiBaseUrl}/");
+            client.Timeout = TimeSpan.FromSeconds(25);
+            var apiKey = builder.Configuration["Ai:ApiKey"];
+            if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
+            }
+        });
+
+        builder.Services.AddHttpClient<VpsMonitor.Web.Infrastructure.Telegram.TelegramBotService>();
+        builder.Services.AddSingleton<VpsMonitor.Web.Infrastructure.Telegram.TelegramBotService>();
+        builder.Services.AddSingleton<VpsMonitor.Web.Infrastructure.Telegram.ITelegramNotificationDispatcher>(sp => sp.GetRequiredService<VpsMonitor.Web.Infrastructure.Telegram.TelegramBotService>());
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<VpsMonitor.Web.Infrastructure.Telegram.TelegramBotService>());
+
         builder.Services.AddAntiforgery();
         builder.Services.AddRazorComponents()
             .AddInteractiveServerComponents();
@@ -143,6 +159,29 @@ public static class VpsMonitorApp
                         ""UpdatedAtUtc"" timestamp with time zone NOT NULL
                     );
                     CREATE UNIQUE INDEX IF NOT EXISTS ""IX_ProjectAliases_ProjectKey"" ON ""ProjectAliases"" (""ProjectKey"");
+
+                    CREATE TABLE IF NOT EXISTS ""ProjectTasks"" (
+                        ""Id"" uuid NOT NULL PRIMARY KEY,
+                        ""ProjectKey"" character varying(120) NOT NULL,
+                        ""Title"" character varying(200) NOT NULL,
+                        ""Description"" text NOT NULL,
+                        ""Priority"" character varying(30) NOT NULL,
+                        ""Status"" character varying(30) NOT NULL,
+                        ""RawInput"" text NOT NULL,
+                        ""ActionPlanJson"" text NOT NULL,
+                        ""CreatedAtUtc"" timestamp with time zone NOT NULL,
+                        ""CompletedAtUtc"" timestamp with time zone NULL
+                    );
+                    CREATE INDEX IF NOT EXISTS ""IX_ProjectTasks_ProjectKey"" ON ""ProjectTasks"" (""ProjectKey"");
+
+                    CREATE TABLE IF NOT EXISTS ""TelegramConfigs"" (
+                        ""Id"" uuid NOT NULL PRIMARY KEY,
+                        ""BotToken"" character varying(200) NOT NULL,
+                        ""ChatId"" character varying(100) NOT NULL,
+                        ""IsAlertsEnabled"" boolean NOT NULL,
+                        ""UpdatedAtUtc"" timestamp with time zone NOT NULL
+                    );
+                
                 ");
             }
             catch

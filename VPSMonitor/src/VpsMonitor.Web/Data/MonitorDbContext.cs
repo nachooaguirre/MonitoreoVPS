@@ -12,6 +12,8 @@ public sealed class MonitorDbContext(DbContextOptions<MonitorDbContext> options)
     public DbSet<ProjectAlias> ProjectAliases => Set<ProjectAlias>();
     public DbSet<HealthCheckDefinition> HealthCheckDefinitions => Set<HealthCheckDefinition>();
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+    public DbSet<ProjectTask> ProjectTasks => Set<ProjectTask>();
+    public DbSet<TelegramConfig> TelegramConfigs => Set<TelegramConfig>();
 
     public async Task<MonitorUser?> FindUserByUsernameAsync(string username, CancellationToken cancellationToken = default)
     {
