@@ -4,9 +4,14 @@ using System.Text;
 using System.Text.Json;
 using VpsMonitor.Web.Infrastructure.Health;
 
+using VpsMonitor.Web.Infrastructure.Prometheus;
+
+public sealed record WebChatMessage(string Role, string Content);
+
 public interface IAiDiagnosticsClient
 {
     Task<string> DiagnosticReportAsync(HealthSummaryReport report, CancellationToken ct = default);
+    Task<string> ChatAsync(string userMessage, List<WebChatMessage> history, HealthSummaryReport health, VpsMetrics? metrics, CancellationToken ct = default);
 }
 
 public sealed class AiDiagnosticsClient : IAiDiagnosticsClient
@@ -67,6 +72,97 @@ public sealed class AiDiagnosticsClient : IAiDiagnosticsClient
             _logger.LogWarning(ex, "Failed to call AI Diagnostics API. Using fallback report.");
             return GenerateFallbackReport(report);
         }
+    }
+
+    public async Task<string> ChatAsync(string userMessage, List<WebChatMessage> history, HealthSummaryReport health, VpsMetrics? metrics, CancellationToken ct = default)
+    {
+        var enabled = _configuration.GetValue("Ai:Enabled", false);
+        if (!enabled)
+        {
+            return "El servicio de Inteligencia Artificial (NVIDIA DeepSeek-R1) está deshabilitado en la configuración.";
+        }
+
+        try
+        {
+            var systemContext = BuildSystemContext(health, metrics);
+            var messagesList = new List<object>
+            {
+                new { role = "system", content = systemContext }
+            };
+
+            foreach (var h in history.TakeLast(6))
+            {
+                messagesList.Add(new { role = h.Role, content = h.Content });
+            }
+
+            messagesList.Add(new { role = "user", content = userMessage });
+
+            var requestBody = new
+            {
+                model = _configuration["Ai:Model"] ?? "deepseek-ai/deepseek-r1",
+                messages = messagesList,
+                temperature = 0.7,
+                max_tokens = 1024
+            };
+
+            var requestUrl = "chat/completions";
+            using var response = await _httpClient.PostAsJsonAsync(requestUrl, requestBody, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                return $"Error de conexión con la IA (Status {response.StatusCode}). Por favor reintenta en unos instantes.";
+            }
+
+            using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+            var content = doc.RootElement
+                .GetProperty("choices")[0]
+                .GetProperty("message")
+                .GetProperty("content")
+                .GetString();
+
+            return content ?? "No se recibió respuesta de la IA.";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error calling ChatAsync on DeepSeek-R1");
+            return "Ocurrió un error al procesar tu mensaje con la IA. Consulta los logs del sistema.";
+        }
+    }
+
+    private static string BuildSystemContext(HealthSummaryReport health, VpsMetrics? metrics)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("Eres un asistente virtual de IA (NVIDIA DeepSeek-R1) integrado en el panel de control de VPS Monitor.");
+        sb.AppendLine("Responde en español de forma amable, natural, profesional y concisa.");
+        sb.AppendLine("Tienes acceso al estado en vivo del servidor VPS:");
+        sb.AppendLine($"- Estado global: {health.Status.ToUpper()}");
+        sb.AppendLine($"- Proyectos totales: {health.TotalProjects} (Saludables: {health.HealthyProjects}, Degradados: {health.DegradedProjects}, Insaludables: {health.UnhealthyProjects})");
+        sb.AppendLine($"- Contenedores: {health.RunningContainers} activos, {health.UnhealthyContainers} fallando, {health.StoppedContainers} detenidos");
+        
+        if (metrics != null)
+        {
+            sb.AppendLine($"- CPU: {metrics.CpuPercent}%");
+            sb.AppendLine($"- RAM: {metrics.MemoryUsedGb} GB / {metrics.MemoryTotalGb} GB ({metrics.MemoryPercent}%)");
+            sb.AppendLine($"- Disco: {metrics.DiskPercent}%");
+            sb.AppendLine($"- Load Average (1m, 5m, 15m): {metrics.Load1m}, {metrics.Load5m}, {metrics.Load15m}");
+            sb.AppendLine($"- Uptime: {TimeSpan.FromSeconds(metrics.UptimeSeconds).TotalDays:F1} días");
+        }
+
+        if (health.ActiveAlerts.Any())
+        {
+            sb.AppendLine("- Alertas Activas:");
+            foreach (var a in health.ActiveAlerts)
+            {
+                sb.AppendLine($"  * {a.AlertName} ({a.Severity}): {a.Summary}");
+            }
+        }
+        else
+        {
+            sb.AppendLine("- Alertas Activas: Ninguna (0 alertas)");
+        }
+
+        sb.AppendLine("\nSi el usuario pide expresamente crear o planificar una tarea para un proyecto o contenedor, instrúyelo o confirma amablemente.");
+
+        return sb.ToString();
     }
 
     private static string BuildDiagnosticPrompt(HealthSummaryReport report)

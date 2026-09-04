@@ -42,57 +42,113 @@
 }
 else
 {
-    <!-- Metric Gauges (5 Column Grid) -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
-        <div class="card">
-            <div class="card-header">
+    <!-- Grafana-Style Metric Gauges & Host System Status Grid -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+        
+        <!-- CPU Usage Gauge Card -->
+        <div class="card" style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.08); padding: 1.25rem; border-radius: 12px;">
+            <div class="card-header" style="margin-bottom: 0.5rem;">
                 <span class="card-title">CPU Usage</span>
                 <span>💻</span>
             </div>
-            <div class="metric-value">
-                @(_vpsMetrics?.CpuPercent.ToString("F1") ?? "0.0")<span class="metric-unit">%</span>
+            @{
+                var cpuVal = _vpsMetrics?.CpuPercent ?? 0;
+                var cpuColor = GetThresholdColor(cpuVal);
+            }
+            <div class="metric-value" style="color: @cpuColor; font-weight: 800;">
+                @cpuVal.ToString("F1")<span class="metric-unit">%</span>
+            </div>
+            <!-- Progress Bar Gauge -->
+            <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; margin-top: 0.75rem;">
+                <div style="width: @(Math.Min(100, Math.Max(3, cpuVal)))%; height: 100%; background: @cpuColor; transition: width 0.4s ease;"></div>
             </div>
         </div>
 
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">Memory Usage</span>
+        <!-- Memory Usage Gauge Card with GB breakdown -->
+        <div class="card" style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.08); padding: 1.25rem; border-radius: 12px;">
+            <div class="card-header" style="margin-bottom: 0.5rem;">
+                <span class="card-title">Memory (RAM)</span>
                 <span>🧠</span>
             </div>
-            <div class="metric-value">
-                @(_vpsMetrics?.MemoryPercent.ToString("F1") ?? "0.0")<span class="metric-unit">%</span>
+            @{
+                var memVal = _vpsMetrics?.MemoryPercent ?? 0;
+                var memColor = GetThresholdColor(memVal);
+            }
+            <div class="metric-value" style="color: @memColor; font-weight: 800;">
+                @memVal.ToString("F1")<span class="metric-unit">%</span>
+            </div>
+            <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.2rem;">
+                @if (_vpsMetrics != null && _vpsMetrics.MemoryTotalGb > 0)
+                {
+                    <span>@_vpsMetrics.MemoryUsedGb GB / @_vpsMetrics.MemoryTotalGb GB en uso</span>
+                }
+                else
+                {
+                    <span>Medición en vivo</span>
+                }
+            </div>
+            <!-- Progress Bar Gauge -->
+            <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; margin-top: 0.5rem;">
+                <div style="width: @(Math.Min(100, Math.Max(3, memVal)))%; height: 100%; background: @memColor; transition: width 0.4s ease;"></div>
             </div>
         </div>
 
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">Disk Space Used</span>
+        <!-- Disk Usage Gauge Card -->
+        <div class="card" style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.08); padding: 1.25rem; border-radius: 12px;">
+            <div class="card-header" style="margin-bottom: 0.5rem;">
+                <span class="card-title">Disk Usage</span>
                 <span>💾</span>
             </div>
-            <div class="metric-value">
-                @(_vpsMetrics?.DiskPercent.ToString("F1") ?? "0.0")<span class="metric-unit">%</span>
+            @{
+                var diskVal = _vpsMetrics?.DiskPercent ?? 0;
+                var diskColor = GetThresholdColor(diskVal);
+            }
+            <div class="metric-value" style="color: @diskColor; font-weight: 800;">
+                @diskVal.ToString("F1")<span class="metric-unit">%</span>
+            </div>
+            <!-- Progress Bar Gauge -->
+            <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; margin-top: 0.75rem;">
+                <div style="width: @(Math.Min(100, Math.Max(3, diskVal)))%; height: 100%; background: @diskColor; transition: width 0.4s ease;"></div>
             </div>
         </div>
 
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">Network Speed</span>
+        <!-- System Load Averages Card (1m, 5m, 15m) -->
+        <div class="card" style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.08); padding: 1.25rem; border-radius: 12px;">
+            <div class="card-header" style="margin-bottom: 0.5rem;">
+                <span class="card-title">System Load</span>
+                <span>⚖️</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 0.2rem;">
+                <div style="text-align: center;">
+                    <div style="font-size: 1.1rem; font-weight: 700; color: #818cf8;">@(_vpsMetrics?.Load1m.ToString("F2") ?? "0.00")</div>
+                    <div style="font-size: 0.65rem; color: #94a3b8;">1 min</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 1.1rem; font-weight: 700; color: #a5b4fc;">@(_vpsMetrics?.Load5m.ToString("F2") ?? "0.00")</div>
+                    <div style="font-size: 0.65rem; color: #94a3b8;">5 min</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 1.1rem; font-weight: 700; color: #cbd5e1;">@(_vpsMetrics?.Load15m.ToString("F2") ?? "0.00")</div>
+                    <div style="font-size: 0.65rem; color: #94a3b8;">15 min</div>
+                </div>
+            </div>
+            <div style="font-size: 0.7rem; color: #64748b; margin-top: 0.5rem; text-align: center;">Promedio de cola de procesos</div>
+        </div>
+
+        <!-- Network & Uptime Card -->
+        <div class="card" style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.08); padding: 1.25rem; border-radius: 12px;">
+            <div class="card-header" style="margin-bottom: 0.5rem;">
+                <span class="card-title">Red y Uptime</span>
                 <span>⚡</span>
             </div>
-            <div class="metric-value" style="font-size: 1.4rem;">
+            <div style="font-size: 1.15rem; font-weight: 700; color: #38bdf8;">
                 @FormatNetworkSpeed(_vpsMetrics?.NetworkBps ?? 0)
+            </div>
+            <div style="font-size: 0.75rem; color: #34d399; margin-top: 0.4rem;">
+                ⏱️ Uptime: @FormatUptime(_vpsMetrics?.UptimeSeconds ?? 0)
             </div>
         </div>
 
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">Active Alerts</span>
-                <span>🔔</span>
-            </div>
-            <div class="metric-value">
-                @(_healthSummary?.ActiveAlerts.Count ?? 0)
-            </div>
-        </div>
     </div>
 
     <!-- AI Diagnostic Results Card (if generated) -->
@@ -236,6 +292,21 @@ else
         {
             _isAnalyzingAi = false;
         }
+    }
+
+    private static string GetThresholdColor(double percent)
+    {
+        if (percent >= 85.0) return "#ef4444"; // Red (High load / Warning)
+        if (percent >= 70.0) return "#f59e0b"; // Yellow (Degraded)
+        return "#34d399"; // Green (Healthy)
+    }
+
+    private static string FormatUptime(double uptimeSeconds)
+    {
+        var ts = TimeSpan.FromSeconds(uptimeSeconds);
+        if (ts.TotalDays >= 1) return $"{ts.TotalDays:F1} días";
+        if (ts.TotalHours >= 1) return $"{ts.TotalHours:F1} hrs";
+        return $"{ts.TotalMinutes:F0} min";
     }
 
     private static string FormatNetworkSpeed(double bytesPerSec)

@@ -9,7 +9,12 @@ public sealed record VpsMetrics(
     double MemoryPercent,
     double DiskPercent,
     double NetworkBps,
-    double UptimeSeconds
+    double UptimeSeconds,
+    double MemoryTotalGb = 0,
+    double MemoryUsedGb = 0,
+    double Load1m = 0,
+    double Load5m = 0,
+    double Load15m = 0
 );
 
 public sealed record PrometheusAlertInfo(
@@ -49,7 +54,13 @@ public sealed class PrometheusQueryClient : IPrometheusQueryClient
             var netTask = QueryScalarAsync("sum(rate(node_network_receive_bytes_total[1m])) + sum(rate(node_network_transmit_bytes_total[1m]))", ct);
             var uptimeTask = QueryScalarAsync("node_time_seconds - node_boot_time_seconds", ct);
 
-            await Task.WhenAll(cpuTask, memTask, diskTask, netTask, uptimeTask);
+            var memTotalBytesTask = QueryScalarAsync("sum(node_memory_MemTotal_bytes)", ct);
+            var memAvailBytesTask = QueryScalarAsync("sum(node_memory_MemAvailable_bytes)", ct);
+            var load1Task = QueryScalarAsync("node_load1", ct);
+            var load5Task = QueryScalarAsync("node_load5", ct);
+            var load15Task = QueryScalarAsync("node_load15", ct);
+
+            await Task.WhenAll(cpuTask, memTask, diskTask, netTask, uptimeTask, memTotalBytesTask, memAvailBytesTask, load1Task, load5Task, load15Task);
 
             var cpu = await cpuTask;
             if (cpu is null)
@@ -77,6 +88,16 @@ public sealed class PrometheusQueryClient : IPrometheusQueryClient
             }
 
             var uptime = await uptimeTask;
+            var memTotal = await memTotalBytesTask;
+            var memAvail = await memAvailBytesTask;
+
+            double memTotalGb = (memTotal ?? 0) / 1024.0 / 1024.0 / 1024.0;
+            double memAvailGb = (memAvail ?? 0) / 1024.0 / 1024.0 / 1024.0;
+            double memUsedGb = Math.Max(0.0, memTotalGb - memAvailGb);
+
+            var load1 = await load1Task ?? 0.0;
+            var load5 = await load5Task ?? 0.0;
+            var load15 = await load15Task ?? 0.0;
 
             if (cpu is null && mem is null && disk is null && net is null && uptime is null)
             {
@@ -88,7 +109,12 @@ public sealed class PrometheusQueryClient : IPrometheusQueryClient
                 MemoryPercent: Math.Round(Math.Max(0.0, mem ?? 0.0), 2),
                 DiskPercent: Math.Round(Math.Max(0.0, disk ?? 0.0), 2),
                 NetworkBps: Math.Round(Math.Max(0.0, net ?? 0.0), 2),
-                UptimeSeconds: Math.Round(Math.Max(0.0, uptime ?? 0.0), 2)
+                UptimeSeconds: Math.Round(Math.Max(0.0, uptime ?? 0.0), 2),
+                MemoryTotalGb: Math.Round(memTotalGb, 2),
+                MemoryUsedGb: Math.Round(memUsedGb, 2),
+                Load1m: Math.Round(load1, 2),
+                Load5m: Math.Round(load5, 2),
+                Load15m: Math.Round(load15, 2)
             );
         }
         catch (Exception ex)

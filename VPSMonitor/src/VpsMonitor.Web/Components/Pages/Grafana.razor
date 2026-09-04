@@ -1,0 +1,64 @@
+@page "/grafana"
+@inject IConfiguration Configuration
+
+<PageTitle>Grafana Dashboards & Loki Logs — VPS Monitor</PageTitle>
+
+<div class="top-header">
+    <div class="header-title">
+        <h1>📈 Grafana & Loki Monitoring Suite</h1>
+        <p>Paneles de control avanzados, métricas en tiempo real de Prometheus y análisis de logs con Loki y Alloy</p>
+    </div>
+    <div style="display: flex; gap: 0.5rem;">
+        <a href="@_grafanaBaseUrl" target="_blank" class="btn-primary" style="padding: 0.45rem 0.9rem; font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 0.4rem;">
+            <span>↗️ Abrir Grafana Directo</span>
+        </a>
+    </div>
+</div>
+
+<!-- Dashboard Switcher Tabs -->
+<div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.25rem;">
+    <button type="button" class="btn-primary" style="background: @(_activeTab == "vps" ? "#6366f1" : "rgba(255,255,255,0.08)"); border: none; padding: 0.5rem 1rem; font-size: 0.85rem;" @onclick='() => SetActiveTab("vps")'>
+        🖥️ System Overview (Host)
+    </button>
+    <button type="button" class="btn-primary" style="background: @(_activeTab == "projects" ? "#6366f1" : "rgba(255,255,255,0.08)"); border: none; padding: 0.5rem 1rem; font-size: 0.85rem;" @onclick='() => SetActiveTab("projects")'>
+        🚀 Projects & Containers
+    </button>
+    <button type="button" class="btn-primary" style="background: @(_activeTab == "loki" ? "#6366f1" : "rgba(255,255,255,0.08)"); border: none; padding: 0.5rem 1rem; font-size: 0.85rem;" @onclick='() => SetActiveTab("loki")'>
+        📜 Loki Logs Explorer
+    </button>
+</div>
+
+<!-- Embedded Dashboard View Container -->
+<div class="card" style="padding: 0; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; overflow: hidden; height: calc(100vh - 230px); min-height: 560px;">
+    @if (_activeTab == "vps")
+    {
+        <iframe src="@($"{_grafanaBaseUrl}/d/vps-overview/vps-overview?kiosk&theme=dark")" style="width: 100%; height: 100%; border: none;" title="VPS System Overview"></iframe>
+    }
+    else if (_activeTab == "projects")
+    {
+        <iframe src="@($"{_grafanaBaseUrl}/d/projects-overview/projects-overview?kiosk&theme=dark")" style="width: 100%; height: 100%; border: none;" title="Projects & Containers Overview"></iframe>
+    }
+    else if (_activeTab == "loki")
+    {
+        <iframe src="@($"{_grafanaBaseUrl}/explore?left=%5B%22now-1h%22,%22now%22,%22Loki%22,%7B%7D%5D&theme=dark")" style="width: 100%; height: 100%; border: none;" title="Loki Logs Explorer"></iframe>
+    }
+</div>
+
+@code {
+    private string _activeTab = "vps";
+    private string _grafanaBaseUrl = "http://72.61.28.144:3000";
+
+    protected override void OnInitialized()
+    {
+        var configUrl = Configuration["Grafana:ExternalUrl"];
+        if (!string.IsNullOrWhiteSpace(configUrl))
+        {
+            _grafanaBaseUrl = configUrl.TrimEnd('/');
+        }
+    }
+
+    private void SetActiveTab(string tab)
+    {
+        _activeTab = tab;
+    }
+}

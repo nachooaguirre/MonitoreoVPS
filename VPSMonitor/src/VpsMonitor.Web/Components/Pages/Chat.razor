@@ -1,0 +1,250 @@
+@page "/chat"
+@using Microsoft.EntityFrameworkCore
+@using System.Text.Json
+@using VpsMonitor.Web.Data
+@using VpsMonitor.Web.Data.Entities
+@using VpsMonitor.Web.Infrastructure.Ai
+@using VpsMonitor.Web.Infrastructure.Health
+@using VpsMonitor.Web.Infrastructure.Prometheus
+@using VpsMonitor.Web.Infrastructure.Docker
+@inject IAiDiagnosticsClient AiDiagnostics
+@inject IHealthCheckRunner HealthRunner
+@inject IPrometheusQueryClient PrometheusClient
+@inject IAiProjectPlannerService AiPlanner
+@inject IProjectGroupingService ProjectService
+@inject MonitorDbContext Db
+
+<PageTitle>Chat IA Conversacional — VPS Monitor</PageTitle>
+
+<div class="top-header">
+    <div class="header-title">
+        <h1>🤖 Chat IA Conversacional</h1>
+        <p>Habla en lenguaje natural con NVIDIA DeepSeek-R1 sobre tu servidor, contenedores y asignación de tareas</p>
+    </div>
+    @if (_healthSummary != null)
+    {
+        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; padding: 0.4rem 0.8rem; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 8px; color: #a5b4fc;">
+            <span>🟢 Estado: @_healthSummary.Status.ToUpper()</span>
+            <span>•</span>
+            <span>🐳 @_healthSummary.RunningContainers Contenedores</span>
+        </div>
+    }
+</div>
+
+<!-- Main Chat Container -->
+<div class="card" style="display: flex; flex-direction: column; height: calc(100vh - 220px); min-height: 520px; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 0; overflow: hidden;">
+    
+    <!-- Chat Header Banner -->
+    <div style="padding: 1rem 1.5rem; background: rgba(30, 41, 59, 0.6); border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div style="width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, #6366f1, #a855f7); display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">
+                🤖
+            </div>
+            <div>
+                <div style="font-weight: 700; color: #fff; font-size: 0.95rem;">Asistente DeepSeek-R1 (SRE & DevOps)</div>
+                <div style="font-size: 0.75rem; color: #34d399; display: flex; align-items: center; gap: 0.35rem;">
+                    <span style="width: 6px; height: 6px; border-radius: 50%; background: #34d399; display: inline-block;"></span> Conectado con contexto en vivo del VPS
+                </div>
+            </div>
+        </div>
+        <button type="button" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 0.35rem 0.75rem; font-size: 0.75rem; color: #cbd5e1; cursor: pointer;" @onclick="ClearChat">
+            🗑️ Limpiar Chat
+        </button>
+    </div>
+
+    <!-- Messages Scroll Area -->
+    <div style="flex: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem;">
+        @foreach (var msg in _chatHistory)
+        {
+            if (msg.Role == "user")
+            {
+                <div style="align-self: flex-end; max-width: 75%; background: linear-gradient(135deg, #6366f1, #4f46e5); color: #fff; padding: 0.85rem 1.15rem; border-radius: 16px 16px 4px 16px; font-size: 0.9rem; line-height: 1.5; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);">
+                    @msg.Content
+                </div>
+            }
+            else
+            {
+                <div style="align-self: flex-start; max-width: 80%; display: flex; gap: 0.75rem;">
+                    <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; margin-top: 0.2rem;">
+                        🤖
+                    </div>
+                    <div style="background: rgba(30, 41, 59, 0.75); border: 1px solid rgba(255, 255, 255, 0.1); color: #e2e8f0; padding: 0.85rem 1.15rem; border-radius: 4px 16px 16px 16px; font-size: 0.9rem; line-height: 1.6; white-space: pre-wrap; word-break: break-word;">
+                        @msg.Content
+                    </div>
+                </div>
+            }
+        }
+
+        @if (_isThinking)
+        {
+            <div style="align-self: flex-start; display: flex; gap: 0.75rem; align-items: center;">
+                <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); display: flex; align-items: center; justify-content: center; font-size: 1rem;">
+                    🧠
+                </div>
+                <div style="background: rgba(30, 41, 59, 0.75); border: 1px solid rgba(255, 255, 255, 0.1); color: #a5b4fc; padding: 0.75rem 1rem; border-radius: 4px 16px 16px 16px; font-size: 0.85rem; font-style: italic;">
+                    DeepSeek-R1 está analizando y redactando respuesta...
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- Quick Action Chips -->
+    <div style="padding: 0.5rem 1.5rem; background: rgba(15, 23, 42, 0.9); border-top: 1px solid rgba(255, 255, 255, 0.05); display: flex; gap: 0.5rem; overflow-x: auto;">
+        <button type="button" class="btn-chip" @onclick='() => SendQuickQuery("¿Cómo está la salud general del VPS y los contenedores?")'>
+            🩺 Estado del VPS
+        </button>
+        <button type="button" class="btn-chip" @onclick='() => SendQuickQuery("¿Qué proyecto o contenedor consume más recursos?")'>
+            ⚡ Consumo de Recursos
+        </button>
+        <button type="button" class="btn-chip" @onclick='() => SendQuickQuery("El cliente de superpos me pidió realizar cambios en afip en el contenedor casba")'>
+            📋 Asignar Tarea de Ejemplo
+        </button>
+    </div>
+
+    <!-- Input Bar -->
+    <div style="padding: 1rem 1.5rem; background: rgba(30, 41, 59, 0.8); border-top: 1px solid rgba(255, 255, 255, 0.08); display: flex; gap: 0.75rem; align-items: center;">
+        <input type="text" @bind="_userInput" @bind:event="oninput" @onkeyup="HandleKeyUp" placeholder="Escribe un mensaje o asigna una tarea a un contenedor..." disabled="@_isThinking" style="flex: 1; padding: 0.75rem 1rem; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 10px; color: #fff; font-size: 0.9rem; outline: none;" />
+        <button type="button" class="btn-primary" style="padding: 0.75rem 1.5rem; font-weight: 600;" @onclick="SendMessageAsync" disabled="@(_isThinking || string.IsNullOrWhiteSpace(_userInput))">
+            <span>Enviar ➔</span>
+        </button>
+    </div>
+</div>
+
+<style>
+    .btn-chip {
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 20px;
+        padding: 0.3rem 0.75rem;
+        font-size: 0.75rem;
+        color: #cbd5e1;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: all 0.2s;
+    }
+    .btn-chip:hover {
+        background: rgba(99, 102, 241, 0.2);
+        border-color: rgba(99, 102, 241, 0.4);
+        color: #a5b4fc;
+    }
+</style>
+
+@code {
+    private List<WebChatMessage> _chatHistory = new();
+    private string _userInput = "";
+    private bool _isThinking;
+    private HealthSummaryReport? _healthSummary;
+    private VpsMetrics? _vpsMetrics;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _healthSummary = await HealthRunner.GetHealthSummaryAsync();
+            _vpsMetrics = await PrometheusClient.GetVpsMetricsAsync();
+        }
+        catch
+        {
+            // fallback
+        }
+
+        _chatHistory.Add(new WebChatMessage("assistant", 
+            "¡Hola! Soy tu asistente de infraestructura impulsado por DeepSeek-R1.\n\n" +
+            "Puedo ayudarte a monitorear tus 25+ contenedores, diagnosticar alertas de sistema, o planificar y asignar tareas a proyectos y contenedores específicos.\n\n" +
+            "¿En qué te puedo colaborar hoy?"));
+    }
+
+    private async Task HandleKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_userInput) && !_isThinking)
+        {
+            await SendMessageAsync();
+        }
+    }
+
+    private async Task SendQuickQuery(string text)
+    {
+        _userInput = text;
+        await SendMessageAsync();
+    }
+
+    private async Task SendMessageAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_userInput) || _isThinking) return;
+
+        var text = _userInput.Trim();
+        _userInput = "";
+
+        _chatHistory.Add(new WebChatMessage("user", text));
+        _isThinking = true;
+
+        try
+        {
+            // Check if this user message is a task assignment request
+            if (IsTaskIntent(text))
+            {
+                var projects = await ProjectService.GetProjectsAsync();
+                var planned = await AiPlanner.PlanTaskFromProposalAsync(text, projects);
+
+                var newTask = new ProjectTask
+                {
+                    Id = Guid.NewGuid(),
+                    ProjectKey = planned.ProjectKey,
+                    ContainerName = planned.ContainerName,
+                    Title = planned.Title,
+                    Description = planned.Description,
+                    Priority = planned.Priority,
+                    Status = "Pending",
+                    RawInput = text,
+                    ActionPlanJson = JsonSerializer.Serialize(planned.ActionPlanSteps),
+                    CreatedAtUtc = DateTime.UtcNow
+                };
+
+                Db.ProjectTasks.Add(newTask);
+                await Db.SaveChangesAsync();
+
+                var containerInfo = !string.IsNullOrWhiteSpace(planned.ContainerName) ? $" (Contenedor: `{planned.ContainerName}`)" : "";
+                var stepsText = string.Join("\n", planned.ActionPlanSteps.Select(s => $"  • {s}"));
+
+                var replyMsg = $"✅ **Tarea Asignada Exitosamente**\n\n" +
+                               $"📦 **Proyecto**: `{planned.ProjectKey}`{containerInfo}\n" +
+                               $"📋 **Título**: {planned.Title}\n" +
+                               $"⚡ **Prioridad**: {planned.Priority}\n\n" +
+                               $"📝 **Descripción**:\n{planned.Description}\n\n" +
+                               $"🛠️ **Pasos de Ejecución**:\n{stepsText}\n\n" +
+                               $"*La tarea ha sido registrada en el módulo de Tareas y Planificación y en las métricas de tu proyecto.*";
+
+                _chatHistory.Add(new WebChatMessage("assistant", replyMsg));
+            }
+            else
+            {
+                var health = _healthSummary ?? await HealthRunner.GetHealthSummaryAsync();
+                var metrics = _vpsMetrics ?? await PrometheusClient.GetVpsMetricsAsync();
+
+                var reply = await AiDiagnostics.ChatAsync(text, _chatHistory, health, metrics);
+                _chatHistory.Add(new WebChatMessage("assistant", reply));
+            }
+        }
+        catch (Exception ex)
+        {
+            _chatHistory.Add(new WebChatMessage("assistant", $"⚠️ Error al procesar tu solicitud: {ex.Message}"));
+        }
+        finally
+        {
+            _isThinking = false;
+        }
+    }
+
+    private static bool IsTaskIntent(string text)
+    {
+        var lower = text.ToLowerInvariant();
+        return lower.Contains("tarea") || lower.Contains("crear") || lower.Contains("asignar") ||
+               lower.Contains("cliente me pidió") || lower.Contains("agregar") || lower.Contains("hacer cambios");
+    }
+
+    private void ClearChat()
+    {
+        _chatHistory.Clear();
+        _chatHistory.Add(new WebChatMessage("assistant", "Chat reiniciado. ¿En qué te puedo ayudar?"));
+    }
+}
