@@ -1,9 +1,12 @@
 @inherits LayoutComponentBase
 @using VpsMonitor.Web.Data.Entities
+@using VpsMonitor.Web.Endpoints
 @using VpsMonitor.Web.Security
 @inject UserSessionState SessionState
 @inject IMonitorStore Store
 @inject IPasswordHasher PasswordHasher
+@inject SessionService SessionService
+@inject IHttpContextAccessor HttpContextAccessor
 @implements IDisposable
 
 @if (!SessionState.IsAuthenticated)
@@ -100,9 +103,33 @@ else
     private string? _loginError;
     private bool _isAuthenticating;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         SessionState.OnChange += StateHasChanged;
+
+        if (!SessionState.IsAuthenticated)
+        {
+            try
+            {
+                var httpContext = HttpContextAccessor.HttpContext;
+                if (httpContext != null)
+                {
+                    var cookieToken = httpContext.Request.Cookies[AuthEndpoints.SessionCookieName];
+                    if (!string.IsNullOrWhiteSpace(cookieToken))
+                    {
+                        var user = await SessionService.LookupUserAsync(cookieToken);
+                        if (user != null)
+                        {
+                            SessionState.Login(user.Username);
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Fallback
+            }
+        }
     }
 
     public void Dispose()
@@ -139,6 +166,26 @@ else
 
             if (isAuthenticated)
             {
+                var userObj = user ?? new MonitorUser { Id = Guid.NewGuid(), Username = displayUser, Role = MonitorUserRole.Owner };
+                try
+                {
+                    var token = await SessionService.CreateSessionAsync(userObj);
+                    var httpContext = HttpContextAccessor.HttpContext;
+                    if (httpContext != null && !httpContext.Response.HasStarted)
+                    {
+                        httpContext.Response.Cookies.Append(AuthEndpoints.SessionCookieName, token, new CookieOptions
+                        {
+                            HttpOnly = true,
+                            SameSite = SameSiteMode.Strict,
+                            Expires = DateTimeOffset.UtcNow.AddDays(30)
+                        });
+                    }
+                }
+                catch
+                {
+                    // Response may have started
+                }
+
                 SessionState.Login(displayUser);
                 _passwordInput = "";
             }
@@ -159,6 +206,18 @@ else
 
     private void Logout()
     {
+        try
+        {
+            var httpContext = HttpContextAccessor.HttpContext;
+            if (httpContext != null && !httpContext.Response.HasStarted)
+            {
+                httpContext.Response.Cookies.Delete(AuthEndpoints.SessionCookieName);
+            }
+        }
+        catch
+        {
+            // ignore
+        }
         SessionState.Logout();
     }
 }

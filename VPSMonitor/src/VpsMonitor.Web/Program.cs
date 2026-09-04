@@ -16,6 +16,7 @@ public static class VpsMonitorApp
         var builder = WebApplication.CreateBuilder(args ?? Array.Empty<string>());
         var sessionMinutes = builder.Configuration.GetValue("Monitor:SessionMinutes", 60);
 
+        builder.Services.AddHttpContextAccessor();
         builder.Services.AddSingleton(new BuildInfo(
             builder.Configuration["APP_VERSION"] ?? "dev",
             builder.Configuration["BUILD_COMMIT"] ?? "unknown"));
@@ -130,6 +131,23 @@ public static class VpsMonitorApp
             catch
             {
                 // Tables already exist
+            }
+
+            try
+            {
+                await db.Database.ExecuteSqlRawAsync(@"
+                    CREATE TABLE IF NOT EXISTS ""ProjectAliases"" (
+                        ""Id"" uuid NOT NULL PRIMARY KEY,
+                        ""ProjectKey"" character varying(120) NOT NULL,
+                        ""Alias"" character varying(120) NOT NULL,
+                        ""UpdatedAtUtc"" timestamp with time zone NOT NULL
+                    );
+                    CREATE UNIQUE INDEX IF NOT EXISTS ""IX_ProjectAliases_ProjectKey"" ON ""ProjectAliases"" (""ProjectKey"");
+                ");
+            }
+            catch
+            {
+                // Table already created
             }
         }
 

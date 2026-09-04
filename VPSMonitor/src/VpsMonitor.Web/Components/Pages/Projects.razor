@@ -3,118 +3,168 @@
 @inject IProjectGroupingService ProjectService
 @inject IDockerReadOnlyClient DockerClient
 
-<PageTitle>Projects & Docker — VPS Monitor</PageTitle>
+<PageTitle>Projects & Workloads — VPS Monitor</PageTitle>
 
 <div class="top-header">
     <div class="header-title">
-        <h1>Projects & Docker Inventory</h1>
-        <p>Coolify & Compose grouped container workloads</p>
+        <h1>Projects & Workloads</h1>
+        <p>Coolify & Compose grouped container infrastructure</p>
     </div>
+    @if (_projects != null)
+    {
+        <div style="font-size: 0.85rem; padding: 0.4rem 0.8rem; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 8px; color: #a5b4fc;">
+            📦 @_projects.Count Proyectos Activos
+        </div>
+    }
 </div>
 
 @if (_isLoading)
 {
-    <div style="padding: 2rem; text-align: center; color: var(--text-muted);">
+    <div style="padding: 3rem; text-align: center; color: var(--text-muted);">
         Cargando inventario de Docker...
     </div>
 }
 else if (_projects == null || !_projects.Any())
 {
     <div class="card" style="text-align: center; padding: 3rem;">
-        <p style="color: var(--text-muted);">No se detectaron proyectos de Docker activos.</p>
+        <p style="color: var(--text-muted);">No se detectaron proyectos de Docker activos en este VPS.</p>
     </div>
 }
 else
 {
-    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+    <!-- Coolify 2-Column Grid Layout -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1.25rem;">
         @foreach (var proj in _projects)
         {
-            <div class="card">
-                <div class="card-header" style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
-                    <div>
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <h2 style="font-size: 1.25rem; font-weight: 700; margin: 0;">@proj.DisplayName</h2>
-                            <button style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 0.2rem 0.5rem; font-size: 0.75rem; color: var(--text-muted); cursor: pointer;" @onclick="() => OpenAliasModal(proj.ProjectKey, proj.DisplayName)">
-                                ✏️ Renombrar
-                            </button>
+            <div class="card project-card" style="display: flex; flex-direction: column; justify-content: space-between; padding: 1.25rem; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; transition: all 0.2s;">
+                <div>
+                    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.75rem;">
+                        <div>
+                            <h3 style="font-size: 1.1rem; font-weight: 700; color: #f8fafc; margin: 0; line-height: 1.3;">@proj.DisplayName</h3>
+                            @if (!string.Equals(proj.DisplayName, proj.ProjectKey, StringComparison.OrdinalIgnoreCase))
+                            {
+                                <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.2rem;">Key: <code>@proj.ProjectKey</code></div>
+                            }
                         </div>
-                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">
-                            <span>Key: <code style="background: rgba(255,255,255,0.05); padding: 0.1rem 0.3rem; border-radius: 4px;">@proj.ProjectKey</code></span>
-                            <span style="margin: 0 0.5rem;">•</span>
-                            <span>Origen: @proj.AssignmentSource</span>
-                        </div>
+                        <span class="badge @GetBadgeClass(proj.OverallStatus)" style="font-size: 0.75rem;">
+                            @proj.OverallStatus.ToUpper()
+                        </span>
                     </div>
-                    <div style="display: flex; gap: 1rem; align-items: center;">
-                        <span style="font-size: 0.85rem; color: var(--text-muted);">Reinicios totales: @proj.TotalRestarts</span>
-                        <span class="badge @GetBadgeClass(proj.OverallStatus)">@proj.OverallStatus</span>
+
+                    <div style="display: flex; align-items: center; gap: 1rem; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+                        <span>🐳 @proj.ContainerCount @(proj.ContainerCount == 1 ? "contenedor" : "contenedores")</span>
+                        <span>•</span>
+                        <span>Origen: @proj.AssignmentSource</span>
                     </div>
                 </div>
 
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Contenedor</th>
-                            <th>Imagen</th>
-                            <th>Estado</th>
-                            <th>Uptime / Status</th>
-                            <th>Acción</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var c in proj.Containers)
-                        {
-                            <tr>
-                                <td><strong>@c.Name</strong></td>
-                                <td style="font-family: monospace; font-size: 0.85rem;">@c.Image</td>
-                                <td>
-                                    <span class="badge @GetBadgeClass(c.State)">
-                                        @c.State
-                                    </span>
-                                </td>
-                                <td style="font-size: 0.85rem; color: var(--text-muted);">@c.Status</td>
-                                <td>
-                                    <button class="btn-primary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; width: auto;" @onclick="() => LoadStatsAsync(c.Id, c.Name)">
-                                        📊 Métricas
-                                    </button>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; pt-0.75rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.75rem;">
+                    <button type="button" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 0.4rem 0.75rem; font-size: 0.8rem; color: #cbd5e1; cursor: pointer; transition: background 0.2s;" @onclick="() => OpenAliasModal(proj.ProjectKey, proj.DisplayName)">
+                        ✏️ Renombrar
+                    </button>
+                    <button type="button" class="btn-primary" style="padding: 0.4rem 0.85rem; font-size: 0.8rem; width: auto;" @onclick="() => OpenProjectDetail(proj)">
+                        🔍 Contenedores y Métricas
+                    </button>
+                </div>
             </div>
         }
     </div>
 }
 
+<!-- Project Detail Modal -->
+@if (_selectedProject != null)
+{
+    <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000;" @onclick="CloseProjectDetail">
+        <div class="card" style="width: 100%; max-width: 800px; max-height: 85vh; overflow-y: auto; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); padding: 1.75rem; border-radius: 16px;" @onclick:stopPropagation="true">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+                <div>
+                    <h2 style="font-size: 1.35rem; font-weight: 700; margin: 0; color: #fff;">@_selectedProject.DisplayName</h2>
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">Key: <code>@_selectedProject.ProjectKey</code></span>
+                </div>
+                <button type="button" style="background: none; border: none; color: #fff; cursor: pointer; font-size: 1.3rem;" @onclick="CloseProjectDetail">✕</button>
+            </div>
+
+            <div style="margin-bottom: 1.25rem; display: flex; gap: 1.5rem; font-size: 0.85rem; color: var(--text-muted); padding: 0.75rem 1rem; background: rgba(255,255,255,0.03); border-radius: 8px;">
+                <div>Estado: <span class="badge @GetBadgeClass(_selectedProject.OverallStatus)">@_selectedProject.OverallStatus</span></div>
+                <div>Contenedores: <strong>@_selectedProject.ContainerCount</strong></div>
+                <div>Reinicios Totales: <strong>@_selectedProject.TotalRestarts</strong></div>
+            </div>
+
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Contenedor</th>
+                        <th>Imagen</th>
+                        <th>Estado</th>
+                        <th>Status / Uptime</th>
+                        <th>Métricas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in _selectedProject.Containers)
+                    {
+                        <tr>
+                            <td><strong>@c.Name</strong></td>
+                            <td style="font-family: monospace; font-size: 0.8rem; color: var(--text-muted);">@c.Image</td>
+                            <td>
+                                <span class="badge @GetBadgeClass(c.State)">
+                                    @c.State
+                                </span>
+                            </td>
+                            <td style="font-size: 0.8rem; color: var(--text-muted);">@c.Status</td>
+                            <td>
+                                <button type="button" class="btn-primary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; width: auto;" @onclick="() => LoadStatsAsync(c.Id, c.Name)">
+                                    📊 Ver Métricas
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+<!-- Rename Alias Modal -->
 @if (_editingProjectKey != null)
 {
-    <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000;" @onclick="CloseAliasModal">
-        <div class="card" style="width: 100%; max-width: 440px; background: #0f172a; border: 1px solid rgba(255,255,255,0.15);" @onclick:stopPropagation="true">
-            <div class="card-header">
-                <h3>Etiquetar / Renombrar Proyecto</h3>
-                <button style="background: none; border: none; color: #fff; cursor: pointer; font-size: 1.2rem;" @onclick="CloseAliasModal">✕</button>
+    <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1100;" @onclick="CloseAliasModal">
+        <div class="card" style="width: 100%; max-width: 440px; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); padding: 1.75rem; border-radius: 16px;" @onclick:stopPropagation="true">
+            <div class="card-header" style="margin-bottom: 1rem;">
+                <h3 style="font-size: 1.15rem; font-weight: 700; margin: 0; color: #fff;">Etiquetar / Renombrar Proyecto</h3>
+                <button type="button" style="background: none; border: none; color: #fff; cursor: pointer; font-size: 1.2rem;" @onclick="CloseAliasModal">✕</button>
             </div>
-            <div style="margin-top: 1rem;">
+            <div>
                 <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
                     Asigna un nombre descriptivo al proyecto (Key: <code>@_editingProjectKey</code>):
                 </p>
-                <input type="text" @bind="_editingAliasInput" placeholder="Ej. SuperPOS Backend, Coolify Proxy" style="width: 100%; padding: 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.9rem; margin-bottom: 1.25rem;" />
+                <input type="text" @bind="_editingAliasInput" placeholder="Ej. SuperPOS Backend, Coolify Proxy" style="width: 100%; padding: 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.9rem; margin-bottom: 1.25rem; outline: none;" />
                 <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
-                    <button style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.1); border: none; border-radius: 6px; color: #fff; cursor: pointer;" @onclick="CloseAliasModal">Cancelar</button>
-                    <button style="padding: 0.5rem 1rem; background: #6366f1; border: none; border-radius: 6px; color: #fff; font-weight: 600; cursor: pointer;" @onclick="SaveAliasAsync">Guardar Nombre</button>
+                    <button type="button" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.1); border: none; border-radius: 6px; color: #fff; cursor: pointer;" @onclick="CloseAliasModal">Cancelar</button>
+                    <button type="button" disabled="@_isSavingAlias" style="padding: 0.5rem 1.25rem; background: #6366f1; border: none; border-radius: 6px; color: #fff; font-weight: 600; cursor: pointer;" @onclick="SaveAliasAsync">
+                        @if (_isSavingAlias)
+                        {
+                            <span>Guardando...</span>
+                        }
+                        else
+                        {
+                            <span>Guardar Nombre</span>
+                        }
+                    </button>
                 </div>
             </div>
         </div>
     </div>
 }
 
+<!-- Live Container Metrics Stats Modal -->
 @if (_isLoadingStats || _selectedContainerStats != null || _statsError != null)
 {
-    <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000;" @onclick="CloseStats">
-        <div class="card" style="width: 100%; max-width: 480px; background: #0f172a; border: 1px solid rgba(255,255,255,0.15);" @onclick:stopPropagation="true">
-            <div class="card-header">
-                <h3>Métricas de @_selectedContainerName</h3>
-                <button style="background: none; border: none; color: #fff; cursor: pointer; font-size: 1.2rem;" @onclick="CloseStats">✕</button>
+    <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1200;" @onclick="CloseStats">
+        <div class="card" style="width: 100%; max-width: 480px; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); padding: 1.75rem; border-radius: 16px;" @onclick:stopPropagation="true">
+            <div class="card-header" style="margin-bottom: 1rem;">
+                <h3 style="font-size: 1.15rem; font-weight: 700; margin: 0; color: #fff;">Métricas de @_selectedContainerName</h3>
+                <button type="button" style="background: none; border: none; color: #fff; cursor: pointer; font-size: 1.2rem;" @onclick="CloseStats">✕</button>
             </div>
 
             @if (_isLoadingStats)
@@ -142,11 +192,11 @@ else
                     </div>
                     <div style="padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 8px;">
                         <div style="font-size: 0.8rem; color: var(--text-muted);">Network RX</div>
-                        <div style="font-size: 1.1rem; font-weight: bold;">@FormatBytes(_selectedContainerStats.NetworkRxBytes)</div>
+                        <div style="font-size: 1.1rem; font-weight: bold; color: #38bdf8;">@FormatBytes(_selectedContainerStats.NetworkRxBytes)</div>
                     </div>
                     <div style="padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 8px;">
                         <div style="font-size: 0.8rem; color: var(--text-muted);">Network TX</div>
-                        <div style="font-size: 1.1rem; font-weight: bold;">@FormatBytes(_selectedContainerStats.NetworkTxBytes)</div>
+                        <div style="font-size: 1.1rem; font-weight: bold; color: #34d399;">@FormatBytes(_selectedContainerStats.NetworkTxBytes)</div>
                     </div>
                 </div>
             }
@@ -158,6 +208,8 @@ else
     private List<ProjectSummary>? _projects;
     private bool _isLoading = true;
 
+    private ProjectSummary? _selectedProject;
+
     private DockerContainerStats? _selectedContainerStats;
     private string? _selectedContainerName;
     private bool _isLoadingStats;
@@ -165,6 +217,7 @@ else
 
     private string? _editingProjectKey;
     private string _editingAliasInput = "";
+    private bool _isSavingAlias;
 
     protected override async Task OnInitializedAsync()
     {
@@ -177,6 +230,10 @@ else
         try
         {
             _projects = await ProjectService.GetProjectsAsync();
+            if (_selectedProject != null && _projects != null)
+            {
+                _selectedProject = _projects.FirstOrDefault(p => p.ProjectKey == _selectedProject.ProjectKey);
+            }
         }
         catch
         {
@@ -186,6 +243,16 @@ else
         {
             _isLoading = false;
         }
+    }
+
+    private void OpenProjectDetail(ProjectSummary proj)
+    {
+        _selectedProject = proj;
+    }
+
+    private void CloseProjectDetail()
+    {
+        _selectedProject = null;
     }
 
     private async Task LoadStatsAsync(string containerId, string name)
@@ -231,12 +298,14 @@ else
     {
         _editingProjectKey = null;
         _editingAliasInput = "";
+        _isSavingAlias = false;
     }
 
     private async Task SaveAliasAsync()
     {
         if (string.IsNullOrWhiteSpace(_editingProjectKey)) return;
 
+        _isSavingAlias = true;
         try
         {
             await ProjectService.SetProjectAliasAsync(_editingProjectKey, _editingAliasInput);
@@ -246,6 +315,10 @@ else
         catch
         {
             // fallback
+        }
+        finally
+        {
+            _isSavingAlias = false;
         }
     }
 
