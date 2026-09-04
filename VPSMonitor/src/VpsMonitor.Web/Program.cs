@@ -58,6 +58,7 @@ public static class VpsMonitorApp
             }
         });
 
+        builder.Services.AddAntiforgery();
         builder.Services.AddRazorComponents()
             .AddInteractiveServerComponents();
 
@@ -77,6 +78,7 @@ public static class VpsMonitorApp
         });
 
         app.UseStaticFiles();
+        app.UseAntiforgery();
 
         app.MapGet("/health", () => Results.Json(new { ok = true }));
         app.MapGet("/metrics", () => Results.Text("# HELP vps_monitor_up Status of VPS Monitor Gateway\n# TYPE vps_monitor_up gauge\nvps_monitor_up 1\n", "text/plain"));
