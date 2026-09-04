@@ -120,7 +120,7 @@ public static class VpsMonitorApp
 
         await using var scope = app.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<MonitorDbContext>();
-        await db.Database.MigrateAsync();
+        await db.Database.EnsureCreatedAsync();
 
         var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
         var existingOwner = await db.MonitorUsers.FirstOrDefaultAsync(user => user.Role == MonitorUserRole.Owner);
