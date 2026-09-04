@@ -8,6 +8,6 @@ RUN dotnet publish "VpsMonitor.Web.csproj" -c Release -o /app/publish /p:UseAppH
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-preview AS final
 WORKDIR /app
 EXPOSE 5080
-ENV ASPNETCORE_URLS=http://+:5080
+ENV ASPNETCORE_URLS=http://0.0.0.0:5080
 COPY --from=build /app/publish .
 ENTRYPOINT ["dotnet", "VpsMonitor.Web.dll"]
