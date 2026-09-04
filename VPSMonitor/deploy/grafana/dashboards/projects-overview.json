@@ -1,0 +1,56 @@
+{
+  "title": "Projects Overview",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Container CPU Usage",
+      "targets": [
+        {
+          "expr": "rate(container_cpu_usage_seconds_total{name!=\"\"}[5m]) * 100",
+          "legendFormat": "{{name}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Container Memory Usage",
+      "targets": [
+        {
+          "expr": "container_memory_usage_bytes{name!=\"\"}",
+          "legendFormat": "{{name}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Container Network",
+      "targets": [
+        {
+          "expr": "rate(container_network_receive_bytes_total{name!=\"\"}[5m])",
+          "legendFormat": "{{name}} Rx",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(container_network_transmit_bytes_total{name!=\"\"}[5m])",
+          "legendFormat": "{{name}} Tx",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Container Restarts",
+      "targets": [
+        {
+          "expr": "increases(container_start_time_seconds{name!=\"\"}[1h])",
+          "legendFormat": "{{name}}",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 38,
+  "timezone": "browser"
+}

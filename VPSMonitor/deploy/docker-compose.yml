@@ -1,0 +1,190 @@
+version: '3.8'
+
+networks:
+  monitor-net:
+    driver: bridge
+
+volumes:
+  monitor-pgdata:
+  prometheus-data:
+  grafana-data:
+  loki-data:
+
+services:
+  gateway:
+    build:
+      context: ../src/VpsMonitor.Web
+      dockerfile: Dockerfile
+    container_name: vps-monitor-gateway
+    restart: unless-stopped
+    ports:
+      - "${MONITOR_PORT:-5080}:5080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__Default=Host=postgres;Port=5432;Database=${POSTGRES_DB:-vps_monitor};Username=${POSTGRES_USER:-vps_monitor};Password=${POSTGRES_PASSWORD:-vps_monitor_secret}
+      - MONITOR_OWNER_USERNAME=${MONITOR_OWNER_USERNAME:-admin}
+      - MONITOR_OWNER_PASSWORD=${MONITOR_OWNER_PASSWORD:-admin_change_me_in_prod}
+      - DockerProxy__BaseUrl=http://docker-proxy:2375
+      - Prometheus__BaseUrl=http://prometheus:9090
+      - Loki__BaseUrl=http://loki:3100
+      - Smtp__Enabled=${SMTP_ENABLED:-false}
+      - Smtp__Host=${SMTP_HOST:-smtp.internal}
+      - Smtp__Port=${SMTP_PORT:-25}
+      - Smtp__Username=${SMTP_USERNAME:-}
+      - Smtp__Password=${SMTP_PASSWORD:-}
+      - Smtp__FromAddress=${SMTP_FROM:-no-reply@vpsmonitor.local}
+      - Ai__Enabled=${AI_ENABLED:-false}
+      - Ai__BaseUrl=${AI_BASE_URL:-http://ai-proxy:8080}
+      - Ai__ApiKey=${AI_API_KEY:-}
+    networks:
+      - monitor-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      docker-proxy:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: vps-monitor-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-vps_monitor}
+      - POSTGRES_USER=${POSTGRES_USER:-vps_monitor}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-vps_monitor_secret}
+    volumes:
+      - monitor-pgdata:/var/lib/postgresql/data
+    networks:
+      - monitor-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vps_monitor} -d ${POSTGRES_DB:-vps_monitor}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: vps-monitor-docker-proxy
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - CONTAINERS=1
+      - IMAGES=1
+      - INFO=1
+      - VERSION=1
+      - POST=0
+      - AUTH=0
+      - SECRETS=0
+      - EXEC=0
+      - ATTACH=0
+      - BUILD=0
+      - COMMIT=0
+      - CONFIGS=0
+      - DISTRIBUTION=0
+      - EVENTS=0
+      - GRANTS=0
+      - NODES=0
+      - NETWORKS=0
+      - PLUGINS=0
+      - SERVICES=0
+      - SWARM=0
+      - SYSTEM=0
+      - TASKS=0
+      - VOLUMES=0
+    networks:
+      - monitor-net
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: vps-monitor-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-data:/prometheus
+    networks:
+      - monitor-net
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+
+  node-exporter:
+    image: prom/node-exporter:v1.7.0
+    container_name: vps-monitor-node-exporter
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+    networks:
+      - monitor-net
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: vps-monitor-cadvisor
+    restart: unless-stopped
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
+      - monitor-net
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: vps-monitor-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin_change_me}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    networks:
+      - monitor-net
+
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: vps-monitor-loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki-data:/tmp/loki
+    networks:
+      - monitor-net
+
+  alloy:
+    image: grafana/alloy:v1.0.0
+    container_name: vps-monitor-alloy
+    restart: unless-stopped
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: run --server.http.listen-addr=0.0.0.0:12345 /etc/alloy/config.alloy
+    networks:
+      - monitor-net
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: vps-monitor-alertmanager
+    restart: unless-stopped
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    networks:
+      - monitor-net

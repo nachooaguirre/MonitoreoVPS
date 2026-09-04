@@ -1,0 +1,65 @@
+groups:
+  - name: monitor-alerts
+    rules:
+      - alert: GatewayDown
+        expr: up{job="gateway"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Gateway service is down"
+          description: "The API gateway has been unreachable for more than 1 minute."
+
+      - alert: HighCpuUsage
+        expr: (100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)) > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU Usage"
+          description: "CPU usage is > 85% for more than 5 minutes on {{ $labels.instance }}."
+
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Memory Usage"
+          description: "Memory usage is > 90% for more than 5 minutes on {{ $labels.instance }}."
+
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|fuse.lxcfs|squashfs|vfat"} / node_filesystem_size_bytes{fstype!~"tmpfs|fuse.lxcfs|squashfs|vfat"} * 100) < 15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low Disk Space"
+          description: "Disk space is < 15% free on {{ $labels.instance }}."
+
+      - alert: ContainerRestarting
+        expr: increases(container_start_time_seconds[15m]) > 3
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container Restarting Frequently"
+          description: "Container {{ $labels.name }} has restarted more than 3 times in 15 minutes."
+
+      - alert: ServiceHealthCheckFailing
+        expr: probe_success == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service Health Check Failing"
+          description: "Service {{ $labels.instance }} is failing its health check."
+
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High API Latency"
+          description: "p95 request latency is > 2s for 5 minutes."

@@ -15,7 +15,7 @@ public static class AuthEndpoints
         return endpoints;
     }
 
-    public static RouteHandlerBuilder RequireMonitorOwner(this RouteHandlerBuilder builder)
+    public static TBuilder RequireMonitorOwner<TBuilder>(this TBuilder builder) where TBuilder : IEndpointConventionBuilder
     {
         return builder.AddEndpointFilter(async (context, next) =>
         {

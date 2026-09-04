@@ -1,0 +1,102 @@
+@page "/audit"
+@using Microsoft.EntityFrameworkCore
+@using VpsMonitor.Web.Data
+@using VpsMonitor.Web.Data.Entities
+@inject IMonitorStore Store
+
+<PageTitle>Security & Audit — VPS Monitor</PageTitle>
+
+<div class="top-header">
+    <div class="header-title">
+        <h1>Security & Audit Trail</h1>
+        <p>Access logs, authentication events, and administrative audit entries</p>
+    </div>
+</div>
+
+@if (_isLoading)
+{
+    <div style="padding: 2rem; text-align: center; color: var(--text-muted);">
+        Cargando registro de auditoría...
+    </div>
+}
+else
+{
+    <div class="card">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Fecha (UTC)</th>
+                    <th>Usuario</th>
+                    <th>Acción</th>
+                    <th>Objetivo</th>
+                    <th>IP</th>
+                    <th>Estado</th>
+                    <th>Detalle</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (_auditEntries != null && _auditEntries.Any())
+                {
+                    @foreach (var entry in _auditEntries)
+                    {
+                        <tr>
+                            <td style="font-size: 0.85rem; color: var(--text-muted);">
+                                @entry.OccurredAtUtc.ToString("yyyy-MM-dd HH:mm:ss")
+                            </td>
+                            <td><strong>@(string.IsNullOrEmpty(entry.Username) ? "anónimo" : entry.Username)</strong></td>
+                            <td><span style="font-family: monospace; font-size: 0.85rem;">@entry.Action</span></td>
+                            <td style="font-size: 0.85rem;">@entry.Target</td>
+                            <td style="font-family: monospace; font-size: 0.85rem; color: var(--text-muted);">@entry.RequestIp</td>
+                            <td>
+                                @if (entry.Success)
+                                {
+                                    <span class="badge badge-healthy">ÉXITO</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-unhealthy">FALLO</span>
+                                }
+                            </td>
+                            <td style="font-size: 0.85rem; color: var(--text-muted);">@entry.Detail</td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="7" style="text-align: center; color: var(--text-muted);">
+                            No hay entradas de auditoría registradas.
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<AuditEntry>? _auditEntries;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            if (Store is MonitorDbContext db)
+            {
+                _auditEntries = await db.AuditEntries
+                    .OrderByDescending(e => e.OccurredAtUtc)
+                    .Take(100)
+                    .ToListAsync();
+            }
+        }
+        catch
+        {
+            _auditEntries = new List<AuditEntry>();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

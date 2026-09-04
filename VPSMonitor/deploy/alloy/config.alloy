@@ -1,0 +1,33 @@
+logging {
+  level = "info"
+}
+
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+loki.source.docker "docker_logs" {
+  host = "unix:///var/run/docker.sock"
+  targets = discovery.docker.containers.targets
+  forward_to = [loki.process.add_labels.receiver]
+  relabel_rules = discovery.docker.containers.rules
+}
+
+loki.process "add_labels" {
+  forward_to = [loki.write.local.receiver]
+
+  stage.docker { }
+
+  stage.labels {
+    values = {
+      container_name = "",
+      project = "",
+    }
+  }
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

@@ -4,6 +4,9 @@ using Microsoft.EntityFrameworkCore;
 using VpsMonitor.Web.Data;
 using VpsMonitor.Web.Data.Entities;
 using VpsMonitor.Web.Endpoints;
+using VpsMonitor.Web.Infrastructure.Docker;
+using VpsMonitor.Web.Infrastructure.Health;
+using VpsMonitor.Web.Infrastructure.Prometheus;
 using VpsMonitor.Web.Security;
 
 public static class VpsMonitorApp
@@ -26,6 +29,38 @@ public static class VpsMonitorApp
             provider.GetRequiredService<TimeProvider>(),
             TimeSpan.FromMinutes(sessionMinutes)));
 
+        var dockerProxyUrl = builder.Configuration["DockerProxy:BaseUrl"] ?? "http://docker-proxy:2375";
+        builder.Services.AddHttpClient<IDockerReadOnlyClient, DockerReadOnlyClient>(client =>
+        {
+            client.BaseAddress = new Uri(dockerProxyUrl.EndsWith('/') ? dockerProxyUrl : $"{dockerProxyUrl}/");
+            client.Timeout = TimeSpan.FromSeconds(10);
+        });
+        builder.Services.AddScoped<IProjectGroupingService, ProjectGroupingService>();
+
+        var prometheusUrl = builder.Configuration["Prometheus:BaseUrl"] ?? "http://prometheus:9090";
+        builder.Services.AddHttpClient<IPrometheusQueryClient, PrometheusQueryClient>(client =>
+        {
+            client.BaseAddress = new Uri(prometheusUrl.EndsWith('/') ? prometheusUrl : $"{prometheusUrl}/");
+            client.Timeout = TimeSpan.FromSeconds(10);
+        });
+        builder.Services.AddScoped<IHealthCheckRunner, HealthCheckRunner>();
+        builder.Services.AddScoped<VpsMonitor.Web.Infrastructure.Notifications.IEmailNotificationService, VpsMonitor.Web.Infrastructure.Notifications.EmailNotificationService>();
+
+        var aiBaseUrl = builder.Configuration["Ai:BaseUrl"] ?? "http://ai-proxy:8080";
+        builder.Services.AddHttpClient<VpsMonitor.Web.Infrastructure.Ai.IAiDiagnosticsClient, VpsMonitor.Web.Infrastructure.Ai.AiDiagnosticsClient>(client =>
+        {
+            client.BaseAddress = new Uri(aiBaseUrl.EndsWith('/') ? aiBaseUrl : $"{aiBaseUrl}/");
+            client.Timeout = TimeSpan.FromSeconds(15);
+            var apiKey = builder.Configuration["Ai:ApiKey"];
+            if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
+            }
+        });
+
+        builder.Services.AddRazorComponents()
+            .AddInteractiveServerComponents();
+
         return builder;
     }
 
@@ -33,13 +68,30 @@ public static class VpsMonitorApp
     {
         var app = builder.Build();
 
+        app.Use(async (context, next) =>
+        {
+            context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+            context.Response.Headers.Append("X-Frame-Options", "DENY");
+            context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+            await next();
+        });
+
+        app.UseStaticFiles();
+
         app.MapGet("/health", () => Results.Json(new { ok = true }));
+        app.MapGet("/metrics", () => Results.Text("# HELP vps_monitor_up Status of VPS Monitor Gateway\n# TYPE vps_monitor_up gauge\nvps_monitor_up 1\n", "text/plain"));
         app.MapGet("/api/version", (BuildInfo buildInfo) => Results.Json(new
         {
             version = buildInfo.ApplicationVersion,
             commit = buildInfo.BuildCommit
         }));
         app.MapAuthEndpoints();
+        app.MapProjectsEndpoints();
+        app.MapContainersEndpoints();
+        app.MapMetricsEndpoints();
+
+        app.MapRazorComponents<Components.App>()
+            .AddInteractiveServerRenderMode();
 
         return app;
     }

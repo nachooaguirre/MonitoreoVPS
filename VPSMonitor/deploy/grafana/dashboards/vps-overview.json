@@ -1,0 +1,79 @@
+{
+  "title": "VPS Overview",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "CPU Usage",
+      "targets": [
+        {
+          "expr": "100 - (avg by(instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Memory Usage",
+      "targets": [
+        {
+          "expr": "node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Disk Usage",
+      "targets": [
+        {
+          "expr": "node_filesystem_size_bytes{fstype!~\"tmpfs|fuse.lxcfs|squashfs|vfat\"} - node_filesystem_free_bytes{fstype!~\"tmpfs|fuse.lxcfs|squashfs|vfat\"}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Network Traffic",
+      "targets": [
+        {
+          "expr": "rate(node_network_receive_bytes_total[5m])",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(node_network_transmit_bytes_total[5m])",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Load Average",
+      "targets": [
+        {
+          "expr": "node_load1",
+          "refId": "A"
+        },
+        {
+          "expr": "node_load5",
+          "refId": "B"
+        },
+        {
+          "expr": "node_load15",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Uptime",
+      "targets": [
+        {
+          "expr": "time() - node_boot_time_seconds",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 38,
+  "timezone": "browser"
+}

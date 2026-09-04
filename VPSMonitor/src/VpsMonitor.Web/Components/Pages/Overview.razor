@@ -1,0 +1,169 @@
+@page "/"
+@using VpsMonitor.Web.Infrastructure.Health
+@using VpsMonitor.Web.Infrastructure.Prometheus
+@inject IHealthCheckRunner HealthRunner
+@inject IPrometheusQueryClient PrometheusClient
+
+<PageTitle>Overview — VPS Monitor</PageTitle>
+
+<div class="top-header">
+    <div class="header-title">
+        <h1>VPS System Overview</h1>
+        <p>Real-time infrastructure health and Prometheus host metrics</p>
+    </div>
+    <div>
+        @if (_healthSummary != null)
+        {
+            <span class="badge @GetBadgeClass(_healthSummary.Status)">
+                ● @_healthSummary.Status.ToUpper()
+            </span>
+        }
+    </div>
+</div>
+
+@if (_isLoading)
+{
+    <div style="padding: 2rem; text-align: center; color: var(--text-muted);">
+        Cargando métricas del sistema...
+    </div>
+}
+else
+{
+    <!-- Metric Gauges -->
+    <div class="grid-4">
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">CPU Usage</span>
+                <span>💻</span>
+            </div>
+            <div class="metric-value">
+                @(_vpsMetrics?.CpuPercent.ToString("F1") ?? "0.0")<span class="metric-unit">%</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Memory Usage</span>
+                <span>🧠</span>
+            </div>
+            <div class="metric-value">
+                @(_vpsMetrics?.MemoryPercent.ToString("F1") ?? "0.0")<span class="metric-unit">%</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Disk Space Used</span>
+                <span>💾</span>
+            </div>
+            <div class="metric-value">
+                @(_vpsMetrics?.DiskPercent.ToString("F1") ?? "0.0")<span class="metric-unit">%</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Active Alerts</span>
+                <span>🔔</span>
+            </div>
+            <div class="metric-value">
+                @(_healthSummary?.ActiveAlerts.Count ?? 0)
+            </div>
+        </div>
+    </div>
+
+    <!-- Details Grid -->
+    <div class="grid-2">
+        <div class="card">
+            <h3 style="margin-bottom: 1rem; font-size: 1.1rem;">Projects Health Summary</h3>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Proyecto</th>
+                        <th>Contenedores</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (_healthSummary != null && _healthSummary.Projects.Any())
+                    {
+                        @foreach (var proj in _healthSummary.Projects)
+                        {
+                            <tr>
+                                <td><strong>@proj.ProjectKey</strong></td>
+                                <td>@proj.TotalContainers</td>
+                                <td>
+                                    <span class="badge @GetBadgeClass(proj.Status)">
+                                        @proj.Status
+                                    </span>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="3" style="color: var(--text-muted);">Sin datos de proyectos registrados</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card">
+            <h3 style="margin-bottom: 1rem; font-size: 1.1rem;">Active Prometheus Alerts</h3>
+            @if (_healthSummary != null && _healthSummary.ActiveAlerts.Any())
+            {
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    @foreach (var alert in _healthSummary.ActiveAlerts)
+                    {
+                        <div style="padding: 0.75rem; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                                <strong>@alert.AlertName</strong>
+                                <span class="badge badge-unhealthy">@alert.Severity</span>
+                            </div>
+                            <p style="font-size: 0.85rem; color: var(--text-muted);">@alert.Summary</p>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div style="padding: 1.5rem; text-align: center; color: var(--status-healthy); background: rgba(16, 185, 129, 0.05); border-radius: 8px;">
+                    ✅ No hay alertas activas en el sistema
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private VpsMetrics? _vpsMetrics;
+    private HealthSummaryReport? _healthSummary;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _vpsMetrics = await PrometheusClient.GetVpsMetricsAsync();
+            _healthSummary = await HealthRunner.GetHealthSummaryAsync();
+        }
+        catch
+        {
+            // Graceful fallback
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private static string GetBadgeClass(string status) => status.ToLower() switch
+    {
+        "healthy" => "badge-healthy",
+        "degraded" => "badge-degraded",
+        "unhealthy" => "badge-unhealthy",
+        _ => "badge-healthy"
+    };
+}

@@ -1,0 +1,41 @@
+@inherits LayoutComponentBase
+
+<div class="app-container">
+    <aside class="sidebar">
+        <div class="brand">
+            <div class="brand-icon">V</div>
+            <span>VPS Monitor</span>
+        </div>
+
+        <nav>
+            <ul class="nav-menu">
+                <li>
+                    <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                        <span>📊</span> Overview
+                    </NavLink>
+                </li>
+                <li>
+                    <NavLink class="nav-link" href="projects">
+                        <span>🚀</span> Projects & Docker
+                    </NavLink>
+                </li>
+                <li>
+                    <NavLink class="nav-link" href="audit">
+                        <span>🛡️</span> Security & Audit
+                    </NavLink>
+                </li>
+            </ul>
+        </nav>
+
+        <div style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+            <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: var(--text-muted);">
+                <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--status-healthy);"></span>
+                <span>System Online</span>
+            </div>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        @Body
+    </main>
+</div>

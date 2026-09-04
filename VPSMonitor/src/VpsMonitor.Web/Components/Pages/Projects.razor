@@ -1,0 +1,158 @@
+@page "/projects"
+@using VpsMonitor.Web.Infrastructure.Docker
+@inject IProjectGroupingService ProjectService
+@inject IDockerReadOnlyClient DockerClient
+
+<PageTitle>Projects & Docker — VPS Monitor</PageTitle>
+
+<div class="top-header">
+    <div class="header-title">
+        <h1>Projects & Docker Inventory</h1>
+        <p>Coolify & Compose grouped container workloads</p>
+    </div>
+</div>
+
+@if (_isLoading)
+{
+    <div style="padding: 2rem; text-align: center; color: var(--text-muted);">
+        Cargando inventario de Docker...
+    </div>
+}
+else if (_projects == null || !_projects.Any())
+{
+    <div class="card" style="text-align: center; padding: 3rem;">
+        <p style="color: var(--text-muted);">No se detectaron proyectos de Docker activos.</p>
+    </div>
+}
+else
+{
+    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        @foreach (var proj in _projects)
+        {
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <h2 style="font-size: 1.25rem; margin-bottom: 0.25rem;">@proj.ProjectKey</h2>
+                        <span style="font-size: 0.8rem; color: var(--text-muted);">Origen: @proj.AssignmentSource</span>
+                    </div>
+                    <div style="display: flex; gap: 1rem; align-items: center;">
+                        <span style="font-size: 0.85rem; color: var(--text-muted);">Reinicios totales: @proj.TotalRestarts</span>
+                        <span class="badge @GetBadgeClass(proj.OverallStatus)">@proj.OverallStatus</span>
+                    </div>
+                </div>
+
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Contenedor</th>
+                            <th>Imagen</th>
+                            <th>Estado</th>
+                            <th>Uptime / Status</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var c in proj.Containers)
+                        {
+                            <tr>
+                                <td><strong>@c.Name</strong></td>
+                                <td style="font-family: monospace; font-size: 0.85rem;">@c.Image</td>
+                                <td>
+                                    <span class="badge @GetBadgeClass(c.State)">
+                                        @c.State
+                                    </span>
+                                </td>
+                                <td style="font-size: 0.85rem; color: var(--text-muted);">@c.Status</td>
+                                <td>
+                                    <button class="btn-primary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; width: auto;" @onclick="() => LoadStatsAsync(c.Id, c.Name)">
+                                        Métricas
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+}
+
+@if (_selectedContainerStats != null)
+{
+    <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000;" @onclick="CloseStats">
+        <div class="card" style="width: 100%; max-width: 480px; background: #0f172a;" @onclick:stopPropagation="true">
+            <div class="card-header">
+                <h3>Métricas de @_selectedContainerName</h3>
+                <button style="background: none; border: none; color: #fff; cursor: pointer; font-size: 1.2rem;" @onclick="CloseStats">✕</button>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                <div style="padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">CPU %</div>
+                    <div style="font-size: 1.5rem; font-weight: bold;">@_selectedContainerStats.CpuPercent %</div>
+                </div>
+                <div style="padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">RAM Usada</div>
+                    <div style="font-size: 1.5rem; font-weight: bold;">@_selectedContainerStats.MemoryUsageMb MB</div>
+                </div>
+                <div style="padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">Network RX</div>
+                    <div style="font-size: 1.1rem; font-weight: bold;">@FormatBytes(_selectedContainerStats.NetworkRxBytes)</div>
+                </div>
+                <div style="padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">Network TX</div>
+                    <div style="font-size: 1.1rem; font-weight: bold;">@FormatBytes(_selectedContainerStats.NetworkTxBytes)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<ProjectSummary>? _projects;
+    private bool _isLoading = true;
+    private DockerContainerStats? _selectedContainerStats;
+    private string? _selectedContainerName;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _projects = await ProjectService.GetProjectsAsync();
+        }
+        catch
+        {
+            _projects = new List<ProjectSummary>();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task LoadStatsAsync(string containerId, string name)
+    {
+        _selectedContainerName = name;
+        _selectedContainerStats = await DockerClient.GetContainerStatsAsync(containerId);
+    }
+
+    private void CloseStats()
+    {
+        _selectedContainerStats = null;
+        _selectedContainerName = null;
+    }
+
+    private static string GetBadgeClass(string status) => status.ToLower() switch
+    {
+        "healthy" or "running" => "badge-healthy",
+        "degraded" or "exited" => "badge-degraded",
+        "unhealthy" or "dead" => "badge-unhealthy",
+        _ => "badge-healthy"
+    };
+
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / 1024.0 / 1024.0:F1} MB";
+    }
+}

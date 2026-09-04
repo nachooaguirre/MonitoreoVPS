@@ -42,3 +42,4 @@ documentos_contabilidad/
 gecom/
 # Agent worktrees
 .worktrees/
+.superpowers/
