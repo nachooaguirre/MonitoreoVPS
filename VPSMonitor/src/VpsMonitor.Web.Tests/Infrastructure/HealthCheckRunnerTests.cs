@@ -37,6 +37,11 @@ public class HealthCheckRunnerTests
         {
             return Task.FromResult(_projects.FirstOrDefault(p => p.ProjectKey == projectKey));
         }
+
+        public Task SetProjectAliasAsync(string projectKey, string alias, CancellationToken ct = default)
+        {
+            return Task.CompletedTask;
+        }
     }
 
     private class FakePrometheusQueryClient : IPrometheusQueryClient
@@ -74,7 +79,7 @@ public class HealthCheckRunnerTests
         };
         var projects = new List<ProjectSummary>
         {
-            new("superpos", 1, containers, 0, "healthy", "coolify-label")
+            new("superpos", "superpos", 1, containers, 0, "healthy", "coolify-label")
         };
 
         var clock = new FakeTimeProvider();
@@ -105,7 +110,7 @@ public class HealthCheckRunnerTests
         };
         var projects = new List<ProjectSummary>
         {
-            new("superpos", 1, containers, 0, "unhealthy", "coolify-label")
+            new("superpos", "superpos", 1, containers, 0, "unhealthy", "coolify-label")
         };
 
         var clock = new FakeTimeProvider();
@@ -134,7 +139,7 @@ public class HealthCheckRunnerTests
         };
         var projects = new List<ProjectSummary>
         {
-            new("superpos", 1, containers, 0, "healthy", "coolify-label")
+            new("superpos", "superpos", 1, containers, 0, "healthy", "coolify-label")
         };
 
         var alerts = new List<PrometheusAlertInfo>

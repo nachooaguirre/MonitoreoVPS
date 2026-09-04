@@ -25,7 +25,7 @@ services:
       - ASPNETCORE_URLS=http://0.0.0.0:5080
       - ConnectionStrings__Default=Host=postgres;Port=5432;Database=${POSTGRES_DB:-vps_monitor};Username=${POSTGRES_USER:-vps_monitor};Password=${POSTGRES_PASSWORD:-vps_monitor_secret}
       - MONITOR_OWNER_USERNAME=${MONITOR_OWNER_USERNAME:-admin}
-      - MONITOR_OWNER_PASSWORD=${MONITOR_OWNER_PASSWORD:-admin_change_me_in_prod}
+      - MONITOR_OWNER_PASSWORD=${MONITOR_OWNER_PASSWORD:-admin_password_change_me}
       - DockerProxy__BaseUrl=http://docker-proxy:2375
       - Prometheus__BaseUrl=http://prometheus:9090
       - Loki__BaseUrl=http://loki:3100
@@ -77,6 +77,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - CONTAINERS=1
+      - STATS=1
       - IMAGES=1
       - INFO=1
       - VERSION=1

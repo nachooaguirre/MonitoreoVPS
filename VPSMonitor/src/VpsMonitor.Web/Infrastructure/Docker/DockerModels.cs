@@ -25,6 +25,7 @@ public sealed record DockerContainerStats(
 
 public sealed record ProjectSummary(
     string ProjectKey,
+    string DisplayName,
     int ContainerCount,
     IReadOnlyList<DockerContainerInfo> Containers,
     int TotalRestarts,

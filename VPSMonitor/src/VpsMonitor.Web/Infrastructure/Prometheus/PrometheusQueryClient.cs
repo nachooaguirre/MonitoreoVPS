@@ -43,15 +43,20 @@ public sealed class PrometheusQueryClient : IPrometheusQueryClient
     {
         try
         {
-            var cpuTask = QueryScalarAsync("100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)", ct);
-            var memTask = QueryScalarAsync("(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100", ct);
-            var diskTask = QueryScalarAsync("(1 - (node_filesystem_avail_bytes{fstype!~\"tmpfs|fuse.lxcfs|squashfs|vfat\"} / node_filesystem_size_bytes{fstype!~\"tmpfs|fuse.lxcfs|squashfs|vfat\"})) * 100", ct);
-            var netTask = QueryScalarAsync("sum(rate(node_network_receive_bytes_total[5m])) + sum(rate(node_network_transmit_bytes_total[5m]))", ct);
+            var cpuTask = QueryScalarAsync("100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[1m])) * 100)", ct);
+            var memTask = QueryScalarAsync("(sum(node_memory_MemTotal_bytes) - sum(node_memory_MemAvailable_bytes)) / sum(node_memory_MemTotal_bytes) * 100", ct);
+            var diskTask = QueryScalarAsync("100 - (sum(node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay|fuse.lxcfs|squashfs\"}) / sum(node_filesystem_size_bytes{fstype!~\"tmpfs|overlay|fuse.lxcfs|squashfs\"}) * 100)", ct);
+            var netTask = QueryScalarAsync("sum(rate(node_network_receive_bytes_total[1m])) + sum(rate(node_network_transmit_bytes_total[1m]))", ct);
             var uptimeTask = QueryScalarAsync("node_time_seconds - node_boot_time_seconds", ct);
 
             await Task.WhenAll(cpuTask, memTask, diskTask, netTask, uptimeTask);
 
             var cpu = await cpuTask;
+            if (cpu is null)
+            {
+                cpu = await QueryScalarAsync("100 - (avg(irate(node_cpu_seconds_total{mode=\"idle\"}[1m])) * 100)", ct);
+            }
+
             var mem = await memTask;
             var disk = await diskTask;
             var net = await netTask;

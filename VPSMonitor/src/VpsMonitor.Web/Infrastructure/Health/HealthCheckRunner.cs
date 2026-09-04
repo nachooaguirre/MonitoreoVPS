@@ -25,6 +25,7 @@ public sealed record HealthSummaryReport(
 
 public sealed record ProjectHealthStatus(
     string ProjectKey,
+    string DisplayName,
     string Status,
     int TotalContainers,
     int RunningContainers,
@@ -61,18 +62,18 @@ public sealed class HealthCheckRunner(
                 {
                     projRunning++;
                 }
-                else if (stateLower is "unhealthy" or "restarting" or "dead")
+                else if (stateLower is "unhealthy" or "dead")
                 {
                     projUnhealthy++;
-                    issues.Add($"Container '{container.Name}' state is {container.State}.");
+                    issues.Add($"Contenedor '{container.Name}' estado: {container.State}.");
                 }
-                else if (stateLower is "exited" or "created" or "paused")
+                else if (stateLower is "restarting" or "exited" or "created" or "paused")
                 {
-                    issues.Add($"Container '{container.Name}' state is {container.State}.");
+                    issues.Add($"Contenedor '{container.Name}' estado: {container.State}.");
                 }
                 else
                 {
-                    issues.Add($"Container '{container.Name}' has unknown state: {container.State}.");
+                    issues.Add($"Contenedor '{container.Name}' estado desconocido: {container.State}.");
                 }
             }
 
@@ -84,7 +85,7 @@ public sealed class HealthCheckRunner(
             foreach (var alert in projAlerts)
             {
                 var desc = string.IsNullOrWhiteSpace(alert.Summary) ? alert.AlertName : alert.Summary;
-                issues.Add($"Alert [{alert.Severity}]: {desc}");
+                issues.Add($"Alerta [{alert.Severity}]: {desc}");
             }
 
             string projectStatus;
@@ -103,6 +104,7 @@ public sealed class HealthCheckRunner(
 
             projectStatuses.Add(new ProjectHealthStatus(
                 ProjectKey: proj.ProjectKey,
+                DisplayName: proj.DisplayName,
                 Status: projectStatus,
                 TotalContainers: proj.ContainerCount,
                 RunningContainers: projRunning,

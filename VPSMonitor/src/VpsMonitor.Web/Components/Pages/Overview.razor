@@ -90,7 +90,13 @@ else
                         @foreach (var proj in _healthSummary.Projects)
                         {
                             <tr>
-                                <td><strong>@proj.ProjectKey</strong></td>
+                                <td>
+                                    <div><strong>@proj.DisplayName</strong></div>
+                                    @if (!string.Equals(proj.DisplayName, proj.ProjectKey, StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <div style="font-size: 0.75rem; color: var(--text-muted);">Key: @proj.ProjectKey</div>
+                                    }
+                                </td>
                                 <td>@proj.TotalContainers</td>
                                 <td>
                                     <span class="badge @GetBadgeClass(proj.Status)">

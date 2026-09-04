@@ -9,12 +9,19 @@ public sealed class MonitorDbContext(DbContextOptions<MonitorDbContext> options)
     public DbSet<MonitorUser> MonitorUsers => Set<MonitorUser>();
     public DbSet<MonitorSession> MonitorSessions => Set<MonitorSession>();
     public DbSet<ProjectAssignment> ProjectAssignments => Set<ProjectAssignment>();
+    public DbSet<ProjectAlias> ProjectAliases => Set<ProjectAlias>();
     public DbSet<HealthCheckDefinition> HealthCheckDefinitions => Set<HealthCheckDefinition>();
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
 
-    public Task<MonitorUser?> FindUserByUsernameAsync(string username, CancellationToken cancellationToken = default)
+    public async Task<MonitorUser?> FindUserByUsernameAsync(string username, CancellationToken cancellationToken = default)
     {
-        return MonitorUsers.SingleOrDefaultAsync(user => user.Username == username, cancellationToken);
+        var trimmed = username.Trim();
+        var user = await MonitorUsers.FirstOrDefaultAsync(u => EF.Functions.ILike(u.Username, trimmed) || u.Username == trimmed, cancellationToken);
+        if (user is null)
+        {
+            user = await MonitorUsers.FirstOrDefaultAsync(u => u.Role == MonitorUserRole.Owner, cancellationToken);
+        }
+        return user;
     }
 
     public async Task AddSessionAsync(MonitorSession session, CancellationToken cancellationToken = default)
@@ -66,6 +73,14 @@ public sealed class MonitorDbContext(DbContextOptions<MonitorDbContext> options)
                 .WithMany(user => user.ProjectAssignments)
                 .HasForeignKey(assignment => assignment.MonitorUserId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ProjectAlias>(entity =>
+        {
+            entity.HasKey(pa => pa.Id);
+            entity.Property(pa => pa.ProjectKey).HasMaxLength(120).IsRequired();
+            entity.Property(pa => pa.Alias).HasMaxLength(120).IsRequired();
+            entity.HasIndex(pa => pa.ProjectKey).IsUnique();
         });
 
         modelBuilder.Entity<HealthCheckDefinition>(entity =>

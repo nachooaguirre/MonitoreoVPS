@@ -30,10 +30,19 @@ else
         @foreach (var proj in _projects)
         {
             <div class="card">
-                <div class="card-header">
+                <div class="card-header" style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
                     <div>
-                        <h2 style="font-size: 1.25rem; margin-bottom: 0.25rem;">@proj.ProjectKey</h2>
-                        <span style="font-size: 0.8rem; color: var(--text-muted);">Origen: @proj.AssignmentSource</span>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <h2 style="font-size: 1.25rem; font-weight: 700; margin: 0;">@proj.DisplayName</h2>
+                            <button style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 0.2rem 0.5rem; font-size: 0.75rem; color: var(--text-muted); cursor: pointer;" @onclick="() => OpenAliasModal(proj.ProjectKey, proj.DisplayName)">
+                                ✏️ Renombrar
+                            </button>
+                        </div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">
+                            <span>Key: <code style="background: rgba(255,255,255,0.05); padding: 0.1rem 0.3rem; border-radius: 4px;">@proj.ProjectKey</code></span>
+                            <span style="margin: 0 0.5rem;">•</span>
+                            <span>Origen: @proj.AssignmentSource</span>
+                        </div>
                     </div>
                     <div style="display: flex; gap: 1rem; align-items: center;">
                         <span style="font-size: 0.85rem; color: var(--text-muted);">Reinicios totales: @proj.TotalRestarts</span>
@@ -65,7 +74,7 @@ else
                                 <td style="font-size: 0.85rem; color: var(--text-muted);">@c.Status</td>
                                 <td>
                                     <button class="btn-primary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; width: auto;" @onclick="() => LoadStatsAsync(c.Id, c.Name)">
-                                        Métricas
+                                        📊 Métricas
                                     </button>
                                 </td>
                             </tr>
@@ -77,32 +86,70 @@ else
     </div>
 }
 
-@if (_selectedContainerStats != null)
+@if (_editingProjectKey != null)
+{
+    <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000;" @onclick="CloseAliasModal">
+        <div class="card" style="width: 100%; max-width: 440px; background: #0f172a; border: 1px solid rgba(255,255,255,0.15);" @onclick:stopPropagation="true">
+            <div class="card-header">
+                <h3>Etiquetar / Renombrar Proyecto</h3>
+                <button style="background: none; border: none; color: #fff; cursor: pointer; font-size: 1.2rem;" @onclick="CloseAliasModal">✕</button>
+            </div>
+            <div style="margin-top: 1rem;">
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+                    Asigna un nombre descriptivo al proyecto (Key: <code>@_editingProjectKey</code>):
+                </p>
+                <input type="text" @bind="_editingAliasInput" placeholder="Ej. SuperPOS Backend, Coolify Proxy" style="width: 100%; padding: 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.9rem; margin-bottom: 1.25rem;" />
+                <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                    <button style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.1); border: none; border-radius: 6px; color: #fff; cursor: pointer;" @onclick="CloseAliasModal">Cancelar</button>
+                    <button style="padding: 0.5rem 1rem; background: #6366f1; border: none; border-radius: 6px; color: #fff; font-weight: 600; cursor: pointer;" @onclick="SaveAliasAsync">Guardar Nombre</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_isLoadingStats || _selectedContainerStats != null || _statsError != null)
 {
     <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000;" @onclick="CloseStats">
-        <div class="card" style="width: 100%; max-width: 480px; background: #0f172a;" @onclick:stopPropagation="true">
+        <div class="card" style="width: 100%; max-width: 480px; background: #0f172a; border: 1px solid rgba(255,255,255,0.15);" @onclick:stopPropagation="true">
             <div class="card-header">
                 <h3>Métricas de @_selectedContainerName</h3>
                 <button style="background: none; border: none; color: #fff; cursor: pointer; font-size: 1.2rem;" @onclick="CloseStats">✕</button>
             </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
-                <div style="padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 8px;">
-                    <div style="font-size: 0.8rem; color: var(--text-muted);">CPU %</div>
-                    <div style="font-size: 1.5rem; font-weight: bold;">@_selectedContainerStats.CpuPercent %</div>
+
+            @if (_isLoadingStats)
+            {
+                <div style="padding: 2.5rem; text-align: center; color: var(--text-muted);">
+                    Obteniendo métricas en tiempo real de Docker...
                 </div>
-                <div style="padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 8px;">
-                    <div style="font-size: 0.8rem; color: var(--text-muted);">RAM Usada</div>
-                    <div style="font-size: 1.5rem; font-weight: bold;">@_selectedContainerStats.MemoryUsageMb MB</div>
+            }
+            else if (_statsError != null)
+            {
+                <div style="padding: 1.5rem; text-align: center; color: #fca5a5;">
+                    ⚠️ @_statsError
                 </div>
-                <div style="padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 8px;">
-                    <div style="font-size: 0.8rem; color: var(--text-muted);">Network RX</div>
-                    <div style="font-size: 1.1rem; font-weight: bold;">@FormatBytes(_selectedContainerStats.NetworkRxBytes)</div>
+            }
+            else if (_selectedContainerStats != null)
+            {
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                    <div style="padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                        <div style="font-size: 0.8rem; color: var(--text-muted);">CPU %</div>
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #6366f1;">@_selectedContainerStats.CpuPercent %</div>
+                    </div>
+                    <div style="padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                        <div style="font-size: 0.8rem; color: var(--text-muted);">RAM Usada</div>
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #a855f7;">@_selectedContainerStats.MemoryUsageMb MB</div>
+                    </div>
+                    <div style="padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                        <div style="font-size: 0.8rem; color: var(--text-muted);">Network RX</div>
+                        <div style="font-size: 1.1rem; font-weight: bold;">@FormatBytes(_selectedContainerStats.NetworkRxBytes)</div>
+                    </div>
+                    <div style="padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                        <div style="font-size: 0.8rem; color: var(--text-muted);">Network TX</div>
+                        <div style="font-size: 1.1rem; font-weight: bold;">@FormatBytes(_selectedContainerStats.NetworkTxBytes)</div>
+                    </div>
                 </div>
-                <div style="padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 8px;">
-                    <div style="font-size: 0.8rem; color: var(--text-muted);">Network TX</div>
-                    <div style="font-size: 1.1rem; font-weight: bold;">@FormatBytes(_selectedContainerStats.NetworkTxBytes)</div>
-                </div>
-            </div>
+            }
         </div>
     </div>
 }
@@ -110,11 +157,23 @@ else
 @code {
     private List<ProjectSummary>? _projects;
     private bool _isLoading = true;
+
     private DockerContainerStats? _selectedContainerStats;
     private string? _selectedContainerName;
+    private bool _isLoadingStats;
+    private string? _statsError;
+
+    private string? _editingProjectKey;
+    private string _editingAliasInput = "";
 
     protected override async Task OnInitializedAsync()
     {
+        await RefreshProjectsAsync();
+    }
+
+    private async Task RefreshProjectsAsync()
+    {
+        _isLoading = true;
         try
         {
             _projects = await ProjectService.GetProjectsAsync();
@@ -132,13 +191,62 @@ else
     private async Task LoadStatsAsync(string containerId, string name)
     {
         _selectedContainerName = name;
-        _selectedContainerStats = await DockerClient.GetContainerStatsAsync(containerId);
+        _isLoadingStats = true;
+        _selectedContainerStats = null;
+        _statsError = null;
+
+        try
+        {
+            _selectedContainerStats = await DockerClient.GetContainerStatsAsync(containerId);
+            if (_selectedContainerStats == null)
+            {
+                _statsError = "No se pudieron obtener las métricas del contenedor.";
+            }
+        }
+        catch
+        {
+            _statsError = "Error de comunicación con el socket proxy de Docker.";
+        }
+        finally
+        {
+            _isLoadingStats = false;
+        }
     }
 
     private void CloseStats()
     {
         _selectedContainerStats = null;
         _selectedContainerName = null;
+        _isLoadingStats = false;
+        _statsError = null;
+    }
+
+    private void OpenAliasModal(string projectKey, string currentDisplayName)
+    {
+        _editingProjectKey = projectKey;
+        _editingAliasInput = string.Equals(projectKey, currentDisplayName, StringComparison.OrdinalIgnoreCase) ? "" : currentDisplayName;
+    }
+
+    private void CloseAliasModal()
+    {
+        _editingProjectKey = null;
+        _editingAliasInput = "";
+    }
+
+    private async Task SaveAliasAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_editingProjectKey)) return;
+
+        try
+        {
+            await ProjectService.SetProjectAliasAsync(_editingProjectKey, _editingAliasInput);
+            CloseAliasModal();
+            await RefreshProjectsAsync();
+        }
+        catch
+        {
+            // fallback
+        }
     }
 
     private static string GetBadgeClass(string status) => status.ToLower() switch
