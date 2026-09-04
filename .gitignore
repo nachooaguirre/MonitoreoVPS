@@ -40,3 +40,5 @@ documentos_contabilidad/
 
 # Copia local del sistema legacy Gecom del cliente (ejecutables, datos historicos) — solo para relevamiento
 gecom/
+# Agent worktrees
+.worktrees/
