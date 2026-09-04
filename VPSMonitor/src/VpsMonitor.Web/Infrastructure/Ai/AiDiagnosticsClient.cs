@@ -27,6 +27,16 @@ public sealed class AiDiagnosticsClient : IAiDiagnosticsClient
         _logger = logger;
     }
 
+    private string GetConfiguredModel()
+    {
+        var configured = _configuration["Ai:Model"];
+        if (string.IsNullOrWhiteSpace(configured) || string.Equals(configured, "deepseek-ai/deepseek-r1", StringComparison.OrdinalIgnoreCase))
+        {
+            return "deepseek-ai/deepseek-v4-pro-0813";
+        }
+        return configured;
+    }
+
     public async Task<string> DiagnosticReportAsync(HealthSummaryReport report, CancellationToken ct = default)
     {
         var enabled = _configuration.GetValue("Ai:Enabled", false);
@@ -38,9 +48,10 @@ public sealed class AiDiagnosticsClient : IAiDiagnosticsClient
         try
         {
             var prompt = BuildDiagnosticPrompt(report);
+            var modelToUse = GetConfiguredModel();
             var requestBody = new
             {
-                model = _configuration["Ai:Model"] ?? "deepseek-ai/deepseek-r1",
+                model = modelToUse,
                 messages = new[]
                 {
                     new { role = "system", content = "Eres un ingeniero experto en SRE y DevOps. Analiza la infraestructura del VPS, salud de contenedores y métricas, y provee un diagnóstico conciso con 3 recomendaciones prácticas." },
@@ -52,6 +63,25 @@ public sealed class AiDiagnosticsClient : IAiDiagnosticsClient
 
             var requestUrl = "chat/completions";
             using var response = await _httpClient.PostAsJsonAsync(requestUrl, requestBody, ct);
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound && modelToUse != "deepseek-ai/deepseek-v4-pro-0813")
+            {
+                // Retry with active fallback model
+                var fallbackBody = new
+                {
+                    model = "deepseek-ai/deepseek-v4-pro-0813",
+                    messages = requestBody.messages,
+                    temperature = 0.6,
+                    max_tokens = 1024
+                };
+                using var fallbackResp = await _httpClient.PostAsJsonAsync(requestUrl, fallbackBody, ct);
+                if (fallbackResp.IsSuccessStatusCode)
+                {
+                    using var fdoc = await JsonDocument.ParseAsync(await fallbackResp.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+                    return fdoc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? GenerateFallbackReport(report);
+                }
+            }
+
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("AI Diagnostics request returned status code {StatusCode}", response.StatusCode);
@@ -79,7 +109,7 @@ public sealed class AiDiagnosticsClient : IAiDiagnosticsClient
         var enabled = _configuration.GetValue("Ai:Enabled", false);
         if (!enabled)
         {
-            return "El servicio de Inteligencia Artificial (NVIDIA DeepSeek-R1) está deshabilitado en la configuración.";
+            return "El servicio de Inteligencia Artificial está deshabilitado en la configuración.";
         }
 
         try
@@ -97,9 +127,10 @@ public sealed class AiDiagnosticsClient : IAiDiagnosticsClient
 
             messagesList.Add(new { role = "user", content = userMessage });
 
+            var modelToUse = GetConfiguredModel();
             var requestBody = new
             {
-                model = _configuration["Ai:Model"] ?? "deepseek-ai/deepseek-r1",
+                model = modelToUse,
                 messages = messagesList,
                 temperature = 0.7,
                 max_tokens = 1024
@@ -107,6 +138,25 @@ public sealed class AiDiagnosticsClient : IAiDiagnosticsClient
 
             var requestUrl = "chat/completions";
             using var response = await _httpClient.PostAsJsonAsync(requestUrl, requestBody, ct);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound && modelToUse != "deepseek-ai/deepseek-v4-pro-0813")
+            {
+                // Automatic 404 self-healing retry with active model
+                var fallbackBody = new
+                {
+                    model = "deepseek-ai/deepseek-v4-pro-0813",
+                    messages = messagesList,
+                    temperature = 0.7,
+                    max_tokens = 1024
+                };
+                using var fallbackResp = await _httpClient.PostAsJsonAsync(requestUrl, fallbackBody, ct);
+                if (fallbackResp.IsSuccessStatusCode)
+                {
+                    using var fdoc = await JsonDocument.ParseAsync(await fallbackResp.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+                    return fdoc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "No se recibió respuesta de la IA.";
+                }
+            }
+
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("AI Chat request to {Uri} failed with status code {StatusCode}", response.RequestMessage?.RequestUri, response.StatusCode);
@@ -116,7 +166,7 @@ public sealed class AiDiagnosticsClient : IAiDiagnosticsClient
                 }
                 if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
-                    return $"⚠️ **Error 404 de IA**: La ruta de la API `{response.RequestMessage?.RequestUri}` no fue encontrada. Revisa `AI_BASE_URL` en tu archivo `deploy/.env`.";
+                    return $"⚠️ **Modelo de IA no disponible**: El modelo `{modelToUse}` no está activo en NVIDIA API. Configura `AI_MODEL=deepseek-ai/deepseek-v4-pro-0813` en tu archivo `deploy/.env`.";
                 }
                 return $"Error de conexión con la IA (Status {response.StatusCode}). Por favor reintenta en unos instantes.";
             }
@@ -132,7 +182,7 @@ public sealed class AiDiagnosticsClient : IAiDiagnosticsClient
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Error calling ChatAsync on DeepSeek-R1");
+            _logger.LogWarning(ex, "Error calling ChatAsync on DeepSeek AI");
             return "Ocurrió un error al procesar tu mensaje con la IA. Consulta los logs del sistema.";
         }
     }

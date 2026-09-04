@@ -32,6 +32,16 @@ public sealed class AiProjectPlannerService : IAiProjectPlannerService
         _logger = logger;
     }
 
+    private string GetConfiguredModel()
+    {
+        var configured = _configuration["Ai:Model"];
+        if (string.IsNullOrWhiteSpace(configured) || string.Equals(configured, "deepseek-ai/deepseek-r1", StringComparison.OrdinalIgnoreCase))
+        {
+            return "deepseek-ai/deepseek-v4-pro-0813";
+        }
+        return configured;
+    }
+
     public async Task<PlannedTaskResult> PlanTaskFromProposalAsync(string rawInput, List<ProjectSummary> availableProjects, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(rawInput))
@@ -73,9 +83,10 @@ Responde ÚNICAMENTE con un objeto JSON válido (sin etiquetas markdown ni texto
   ]
 }}";
 
+            var modelToUse = GetConfiguredModel();
             var requestBody = new
             {
-                model = _configuration["Ai:Model"] ?? "deepseek-ai/deepseek-r1",
+                model = modelToUse,
                 messages = new[]
                 {
                     new { role = "system", content = "Eres un Tech Lead y Arquitecto SRE experto. Analizas propuestas de clientes y asocias las tareas al proyecto y contenedor específico correspondiente en JSON estricto." },
@@ -86,6 +97,28 @@ Responde ÚNICAMENTE con un objeto JSON válido (sin etiquetas markdown ni texto
             };
 
             using var response = await _httpClient.PostAsJsonAsync("chat/completions", requestBody, ct);
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound && modelToUse != "deepseek-ai/deepseek-v4-pro-0813")
+            {
+                var fallbackBody = new
+                {
+                    model = "deepseek-ai/deepseek-v4-pro-0813",
+                    messages = requestBody.messages,
+                    temperature = 0.3,
+                    max_tokens = 1024
+                };
+                using var fallbackResp = await _httpClient.PostAsJsonAsync("chat/completions", fallbackBody, ct);
+                if (fallbackResp.IsSuccessStatusCode)
+                {
+                    using var fdoc = await JsonDocument.ParseAsync(await fallbackResp.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+                    var fraw = fdoc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
+                    if (!string.IsNullOrWhiteSpace(fraw))
+                    {
+                        return ParseAiJsonResponse(fraw, availableProjects) ?? CreateFallbackResult(rawInput, availableProjects);
+                    }
+                }
+            }
+
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("AI Task Planner returned status code {StatusCode}", response.StatusCode);
