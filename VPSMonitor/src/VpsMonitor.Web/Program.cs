@@ -124,13 +124,17 @@ public static class VpsMonitorApp
         var databaseCreator = Microsoft.EntityFrameworkCore.Infrastructure.AccessorExtensions.GetService<Microsoft.EntityFrameworkCore.Storage.IRelationalDatabaseCreator>(db.Database);
         if (databaseCreator is not null)
         {
-            if (!await databaseCreator.ExistsAsync())
+            try
             {
-                await databaseCreator.CreateAsync();
-            }
-            if (!await databaseCreator.HasTablesAsync())
-            {
+                if (!await databaseCreator.ExistsAsync())
+                {
+                    await databaseCreator.CreateAsync();
+                }
                 await databaseCreator.CreateTablesAsync();
+            }
+            catch
+            {
+                // Tables already exist
             }
         }
 
