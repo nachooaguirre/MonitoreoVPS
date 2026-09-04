@@ -77,7 +77,7 @@ public sealed class TelegramBotService : BackgroundService, ITelegramNotificatio
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("Telegram Bot Service starting...");
+        _logger.LogInformation("Telegram Bot Service active and waiting for credentials...");
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -87,6 +87,10 @@ public sealed class TelegramBotService : BackgroundService, ITelegramNotificatio
                 if (!string.IsNullOrWhiteSpace(botToken))
                 {
                     await PollTelegramUpdatesAsync(botToken, chatId, stoppingToken);
+                }
+                else
+                {
+                    _logger.LogDebug("Telegram Bot Token is not configured yet.");
                 }
             }
             catch (Exception ex)
@@ -100,9 +104,14 @@ public sealed class TelegramBotService : BackgroundService, ITelegramNotificatio
 
     private async Task PollTelegramUpdatesAsync(string botToken, string configuredChatId, CancellationToken ct)
     {
-        var url = $"https://api.telegram.org/bot{botToken}/getUpdates?offset={_lastUpdateId + 1}&timeout=2";
+        var offsetParam = _lastUpdateId > 0 ? $"offset={_lastUpdateId + 1}&" : "";
+        var url = $"https://api.telegram.org/bot{botToken}/getUpdates?{offsetParam}timeout=2";
         using var response = await _httpClient.GetAsync(url, ct);
-        if (!response.IsSuccessStatusCode) return;
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogWarning("Telegram getUpdates returned status code {StatusCode}", response.StatusCode);
+            return;
+        }
 
         using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
         var root = doc.RootElement;

@@ -39,6 +39,8 @@ services:
       - Ai__BaseUrl=${AI_BASE_URL:-https://integrate.api.nvidia.com/v1}
       - Ai__ApiKey=${AI_API_KEY:-}
       - Ai__Model=${AI_MODEL:-deepseek-ai/deepseek-r1}
+      - Telegram__BotToken=${TELEGRAM_BOT_TOKEN:-}
+      - Telegram__ChatId=${TELEGRAM_CHAT_ID:-}
     networks:
       - monitor-net
     depends_on:
