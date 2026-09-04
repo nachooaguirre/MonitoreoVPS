@@ -1,0 +1,34 @@
+{
+  "ConnectionStrings": {
+    "Default": "Host=localhost;Port=5432;Database=vps_monitor;Username=vps_monitor;Password=dev-password"
+  },
+  "Monitor": {
+    "PublicPort": 5080,
+    "SessionMinutes": 30
+  },
+  "DockerProxy": {
+    "BaseUrl": "http://localhost:2375"
+  },
+  "Prometheus": {
+    "BaseUrl": "http://localhost:9090"
+  },
+  "Loki": {
+    "BaseUrl": "http://localhost:3100"
+  },
+  "Smtp": {
+    "Enabled": false,
+    "Host": "localhost",
+    "Port": 1025,
+    "UseSsl": false,
+    "Username": "",
+    "Password": "",
+    "FromAddress": "dev@vpsmonitor.local",
+    "FromName": "VPS Monitor Dev"
+  },
+  "Ai": {
+    "Enabled": false,
+    "BaseUrl": "http://localhost:8080",
+    "ApiKey": "",
+    "Model": "gpt-4.1-mini"
+  }
+}
