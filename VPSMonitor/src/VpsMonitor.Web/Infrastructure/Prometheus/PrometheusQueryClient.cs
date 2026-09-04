@@ -50,9 +50,9 @@ public sealed class PrometheusQueryClient : IPrometheusQueryClient
         {
             var cpuTask = QueryScalarAsync("100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[1m])) * 100)", ct);
             var memTask = QueryScalarAsync("(sum(node_memory_MemTotal_bytes) - sum(node_memory_MemAvailable_bytes)) / sum(node_memory_MemTotal_bytes) * 100", ct);
-            var diskTask = QueryScalarAsync("100 - (sum(node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay|fuse.lxcfs|squashfs\"}) / sum(node_filesystem_size_bytes{fstype!~\"tmpfs|overlay|fuse.lxcfs|squashfs\"}) * 100)", ct);
+            var diskTask = QueryScalarAsync("100 - (node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"} * 100)", ct);
             var netTask = QueryScalarAsync("sum(rate(node_network_receive_bytes_total[1m])) + sum(rate(node_network_transmit_bytes_total[1m]))", ct);
-            var uptimeTask = QueryScalarAsync("node_time_seconds - node_boot_time_seconds", ct);
+            var uptimeTask = QueryScalarAsync("time() - node_boot_time_seconds", ct);
 
             var memTotalBytesTask = QueryScalarAsync("sum(node_memory_MemTotal_bytes)", ct);
             var memAvailBytesTask = QueryScalarAsync("sum(node_memory_MemAvailable_bytes)", ct);
@@ -63,31 +63,35 @@ public sealed class PrometheusQueryClient : IPrometheusQueryClient
             await Task.WhenAll(cpuTask, memTask, diskTask, netTask, uptimeTask, memTotalBytesTask, memAvailBytesTask, load1Task, load5Task, load15Task);
 
             var cpu = await cpuTask;
-            if (cpu is null)
+            if (cpu is null || double.IsNaN(cpu.Value))
             {
                 cpu = await QueryScalarAsync("100 - (avg(irate(node_cpu_seconds_total{mode=\"idle\"}[1m])) * 100)", ct)
-                   ?? await QueryScalarAsync("100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[30s])) * 100)", ct);
+                   ?? await QueryScalarAsync("sum(rate(container_cpu_usage_seconds_total[1m])) * 10", ct);
             }
 
             var mem = await memTask;
-            if (mem is null)
+            if (mem is null || double.IsNaN(mem.Value))
             {
                 mem = await QueryScalarAsync("(sum(node_memory_MemTotal_bytes) - sum(node_memory_MemFree_bytes)) / sum(node_memory_MemTotal_bytes) * 100", ct);
             }
 
             var disk = await diskTask;
-            if (disk is null)
+            if (disk is null || double.IsNaN(disk.Value))
             {
-                disk = await QueryScalarAsync("100 - (sum(node_filesystem_avail_bytes{mountpoint=\"/\"}) / sum(node_filesystem_size_bytes{mountpoint=\"/\"}) * 100)", ct);
+                disk = await QueryScalarAsync("100 - (sum(node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay|fuse.lxcfs|squashfs\"}) / sum(node_filesystem_size_bytes{fstype!~\"tmpfs|overlay|fuse.lxcfs|squashfs\"}) * 100)", ct);
             }
 
             var net = await netTask;
-            if (net is null)
+            if (net is null || double.IsNaN(net.Value))
             {
                 net = await QueryScalarAsync("sum(rate(container_network_receive_bytes_total[1m])) + sum(rate(container_network_transmit_bytes_total[1m]))", ct);
             }
 
             var uptime = await uptimeTask;
+            if (uptime is null || double.IsNaN(uptime.Value))
+            {
+                uptime = await QueryScalarAsync("node_time_seconds - node_boot_time_seconds", ct);
+            }
             var memTotal = await memTotalBytesTask;
             var memAvail = await memAvailBytesTask;
 

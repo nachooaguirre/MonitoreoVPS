@@ -29,7 +29,7 @@
     <div style="display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
         <div style="flex: 1; min-width: 220px;">
             <label style="display: block; font-size: 0.75rem; color: #94a3b8; margin-bottom: 0.25rem;">Proyecto Destino (Opcional - La IA auto-detecta):</label>
-            <select @bind="_overrideProjectKey" style="width: 100%; padding: 0.5rem 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.85rem; outline: none;">
+            <select value="@_overrideProjectKey" @onchange="OnProjectKeyChanged" style="width: 100%; padding: 0.5rem 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.85rem; outline: none;">
                 <option value="">🤖 Auto-detectar por IA</option>
                 @if (_availableProjects != null)
                 {
@@ -45,15 +45,9 @@
             <label style="display: block; font-size: 0.75rem; color: #94a3b8; margin-bottom: 0.25rem;">Contenedor Destino (Opcional):</label>
             <select @bind="_overrideContainerName" style="width: 100%; padding: 0.5rem 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.85rem; outline: none;">
                 <option value="">🐳 Todos los contenedores / Auto-detectar</option>
-                @if (_availableProjects != null)
+                @foreach (var c in AvailableContainersForSelection)
                 {
-                    @foreach (var p in _availableProjects)
-                    {
-                        @foreach (var c in p.Containers)
-                        {
-                            <option value="@c.Name">@p.DisplayName ➔ @c.Name</option>
-                        }
-                    }
+                    <option value="@c.Name">🐳 @c.Name (@c.Image)</option>
                 }
             </select>
         </div>
@@ -176,6 +170,26 @@ else
     private string _overrideContainerName = "";
     private bool _isPlanning;
     private string _selectedStatusFilter = "All";
+
+    private IEnumerable<DockerContainerInfo> AvailableContainersForSelection
+    {
+        get
+        {
+            if (_availableProjects == null) return Enumerable.Empty<DockerContainerInfo>();
+            if (string.IsNullOrWhiteSpace(_overrideProjectKey))
+            {
+                return _availableProjects.SelectMany(p => p.Containers);
+            }
+            var proj = _availableProjects.FirstOrDefault(p => p.ProjectKey == _overrideProjectKey);
+            return proj?.Containers ?? Enumerable.Empty<DockerContainerInfo>();
+        }
+    }
+
+    private void OnProjectKeyChanged(ChangeEventArgs e)
+    {
+        _overrideProjectKey = e.Value?.ToString() ?? "";
+        _overrideContainerName = "";
+    }
 
     private IEnumerable<ProjectTask> FilteredTasks => _selectedStatusFilter switch
     {

@@ -1,4 +1,4 @@
-@page "/grafana"
+@inject NavigationManager NavManager
 @inject IConfiguration Configuration
 
 <PageTitle>Grafana Dashboards & Loki Logs — VPS Monitor</PageTitle>
@@ -46,7 +46,7 @@
 
 @code {
     private string _activeTab = "vps";
-    private string _grafanaBaseUrl = "http://72.61.28.144:3000";
+    private string _grafanaBaseUrl = "http://localhost:3000";
 
     protected override void OnInitialized()
     {
@@ -54,6 +54,18 @@
         if (!string.IsNullOrWhiteSpace(configUrl))
         {
             _grafanaBaseUrl = configUrl.TrimEnd('/');
+        }
+        else
+        {
+            try
+            {
+                var uri = new Uri(NavManager.BaseUri);
+                _grafanaBaseUrl = $"{uri.Scheme}://{uri.Host}:3000";
+            }
+            catch
+            {
+                _grafanaBaseUrl = "http://72.61.28.144:3000";
+            }
         }
     }
 

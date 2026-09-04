@@ -34,7 +34,7 @@ public static class VpsMonitorApp
         var dockerProxyUrl = builder.Configuration["DockerProxy:BaseUrl"] ?? "http://docker-proxy:2375";
         builder.Services.AddHttpClient<IDockerReadOnlyClient, DockerReadOnlyClient>(client =>
         {
-            client.BaseAddress = new Uri(dockerProxyUrl.EndsWith('/') ? dockerProxyUrl : $"{dockerProxyUrl}/");
+            client.BaseAddress = new Uri(dockerProxyUrl.TrimEnd('/') + "/");
             client.Timeout = TimeSpan.FromSeconds(10);
         });
         builder.Services.AddScoped<IProjectGroupingService, ProjectGroupingService>();
@@ -42,17 +42,18 @@ public static class VpsMonitorApp
         var prometheusUrl = builder.Configuration["Prometheus:BaseUrl"] ?? "http://prometheus:9090";
         builder.Services.AddHttpClient<IPrometheusQueryClient, PrometheusQueryClient>(client =>
         {
-            client.BaseAddress = new Uri(prometheusUrl.EndsWith('/') ? prometheusUrl : $"{prometheusUrl}/");
+            client.BaseAddress = new Uri(prometheusUrl.TrimEnd('/') + "/");
             client.Timeout = TimeSpan.FromSeconds(10);
         });
         builder.Services.AddScoped<IHealthCheckRunner, HealthCheckRunner>();
         builder.Services.AddScoped<VpsMonitor.Web.Infrastructure.Notifications.IEmailNotificationService, VpsMonitor.Web.Infrastructure.Notifications.EmailNotificationService>();
 
-        var aiBaseUrl = builder.Configuration["Ai:BaseUrl"] ?? "http://ai-proxy:8080";
+        var aiBaseUrl = builder.Configuration["Ai:BaseUrl"] ?? "https://integrate.api.nvidia.com/v1";
+        var normalizedAiUrl = aiBaseUrl.TrimEnd('/') + "/";
         builder.Services.AddHttpClient<VpsMonitor.Web.Infrastructure.Ai.IAiDiagnosticsClient, VpsMonitor.Web.Infrastructure.Ai.AiDiagnosticsClient>(client =>
         {
-            client.BaseAddress = new Uri(aiBaseUrl.EndsWith('/') ? aiBaseUrl : $"{aiBaseUrl}/");
-            client.Timeout = TimeSpan.FromSeconds(15);
+            client.BaseAddress = new Uri(normalizedAiUrl);
+            client.Timeout = TimeSpan.FromSeconds(25);
             var apiKey = builder.Configuration["Ai:ApiKey"];
             if (!string.IsNullOrWhiteSpace(apiKey))
             {
@@ -62,8 +63,8 @@ public static class VpsMonitorApp
 
         builder.Services.AddHttpClient<VpsMonitor.Web.Infrastructure.Ai.IAiProjectPlannerService, VpsMonitor.Web.Infrastructure.Ai.AiProjectPlannerService>(client =>
         {
-            client.BaseAddress = new Uri(aiBaseUrl.EndsWith('/') ? aiBaseUrl : $"{aiBaseUrl}/");
-            client.Timeout = TimeSpan.FromSeconds(25);
+            client.BaseAddress = new Uri(normalizedAiUrl);
+            client.Timeout = TimeSpan.FromSeconds(30);
             var apiKey = builder.Configuration["Ai:ApiKey"];
             if (!string.IsNullOrWhiteSpace(apiKey))
             {
@@ -90,7 +91,6 @@ public static class VpsMonitorApp
         app.Use(async (context, next) =>
         {
             context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
-            context.Response.Headers.Append("X-Frame-Options", "DENY");
             context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
             await next();
         });

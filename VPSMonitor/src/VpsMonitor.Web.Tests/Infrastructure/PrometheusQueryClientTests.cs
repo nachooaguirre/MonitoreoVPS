@@ -71,7 +71,7 @@ public class PrometheusQueryClientTests
             else if (query.Contains("node_memory")) val = "65.0";
             else if (query.Contains("node_filesystem")) val = "30.0";
             else if (query.Contains("node_network")) val = "1500.0";
-            else if (query.Contains("node_time")) val = "3600.0";
+            else if (query.Contains("boot_time") || query.Contains("node_time")) val = "3600.0";
 
             var json = $@"{{
                 ""status"": ""success"",

@@ -109,6 +109,7 @@ public sealed class AiDiagnosticsClient : IAiDiagnosticsClient
             using var response = await _httpClient.PostAsJsonAsync(requestUrl, requestBody, ct);
             if (!response.IsSuccessStatusCode)
             {
+                _logger.LogWarning("AI Chat request to {Uri} failed with status code {StatusCode}", response.RequestMessage?.RequestUri, response.StatusCode);
                 return $"Error de conexión con la IA (Status {response.StatusCode}). Por favor reintenta en unos instantes.";
             }
 
