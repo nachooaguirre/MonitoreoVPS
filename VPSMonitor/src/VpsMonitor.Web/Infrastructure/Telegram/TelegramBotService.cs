@@ -201,9 +201,20 @@ Comandos y funciones disponibles:
             return;
         }
 
-        if (textLower.StartsWith("tarea:") || textLower.StartsWith("propuesta:") || textLower.StartsWith("planificar:"))
+        bool isTaskIntent = textLower.StartsWith("tarea:") ||
+                            textLower.StartsWith("propuesta:") ||
+                            textLower.StartsWith("planificar:") ||
+                            textLower.Contains("asignar") ||
+                            textLower.Contains("asigname") ||
+                            textLower.Contains("asigna") ||
+                            textLower.Contains("tarea") ||
+                            textLower.Contains("propuesta") ||
+                            textLower.Contains("requerimiento") ||
+                            textLower.Contains("cliente");
+
+        if (isTaskIntent)
         {
-            var rawProposal = text.Substring(text.IndexOf(':') + 1).Trim();
+            var rawProposal = text.Contains(':') ? text.Substring(text.IndexOf(':') + 1).Trim() : text;
             var projects = await projectGrouping.GetProjectsAsync(ct);
             var planResult = await aiPlanner.PlanTaskFromProposalAsync(rawProposal, projects, ct);
 
@@ -212,6 +223,7 @@ Comandos y funciones disponibles:
             {
                 Id = Guid.NewGuid(),
                 ProjectKey = planResult.ProjectKey,
+                ContainerName = planResult.ContainerName,
                 Title = planResult.Title,
                 Description = planResult.Description,
                 Priority = planResult.Priority,
@@ -227,6 +239,10 @@ Comandos y funciones disponibles:
             var sb = new StringBuilder();
             sb.AppendLine($"<b>📋 TAREA PLANIFICADA Y ASIGNADA (IA)</b>\n");
             sb.AppendLine($"<b>Proyecto:</b> <code>{WebUtilityEncode(planResult.ProjectKey)}</code>");
+            if (!string.IsNullOrWhiteSpace(planResult.ContainerName))
+            {
+                sb.AppendLine($"<b>Contenedor:</b> <code>{WebUtilityEncode(planResult.ContainerName)}</code>");
+            }
             sb.AppendLine($"<b>Título:</b> {WebUtilityEncode(planResult.Title)}");
             sb.AppendLine($"<b>Prioridad:</b> {planResult.Priority}\n");
             sb.AppendLine($"<b>Plan de Acción (Pasos):</b>");
@@ -239,10 +255,58 @@ Comandos y funciones disponibles:
             return;
         }
 
-        // Generic AI Query handling
-        var summary = await healthRunner.GetHealthSummaryAsync(ct);
-        var aiReport = await aiDiagnostics.DiagnosticReportAsync(summary, ct);
-        await ReplyTelegramAsync(botToken, chatIdFromMsg, $"<b>🤖 Diagnóstico IA DeepSeek-R1:</b>\n\n{WebUtilityEncode(aiReport)}", ct);
+        // Generic Conversational Chat handling using DeepSeek-R1
+        var chatReply = await GenerateConversationalReplyAsync(text, scope, ct);
+        await ReplyTelegramAsync(botToken, chatIdFromMsg, chatReply, ct);
+    }
+
+    private async Task<string> GenerateConversationalReplyAsync(string userMessage, IServiceScope scope, CancellationToken ct)
+    {
+        var enabled = _configuration.GetValue("Ai:Enabled", true);
+        if (!enabled)
+        {
+            return "¡Hola! Estoy en línea monitoreando tu VPS. ¿En qué te puedo ayudar hoy con tus proyectos o contenedores?";
+        }
+
+        try
+        {
+            var healthRunner = scope.ServiceProvider.GetRequiredService<IHealthCheckRunner>();
+            var health = await healthRunner.GetHealthSummaryAsync(ct);
+
+            var requestBody = new
+            {
+                model = _configuration["Ai:Model"] ?? "deepseek-ai/deepseek-r1",
+                messages = new[]
+                {
+                    new { role = "system", content = $"Eres un asistente virtual de DevOps y SRE conversacional, amable y muy capaz. Respondes brevemente en español. El estado actual de la infraestructura es {health.Status.ToUpper()} con {health.RunningContainers} contenedores activos." },
+                    new { role = "user", content = userMessage }
+                },
+                temperature = 0.7,
+                max_tokens = 512
+            };
+
+            using var response = await _httpClient.PostAsJsonAsync("chat/completions", requestBody, ct);
+            if (response.IsSuccessStatusCode)
+            {
+                using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+                var content = doc.RootElement
+                    .GetProperty("choices")[0]
+                    .GetProperty("message")
+                    .GetProperty("content")
+                    .GetString();
+
+                if (!string.IsNullOrWhiteSpace(content))
+                {
+                    return WebUtilityEncode(content.Trim());
+                }
+            }
+        }
+        catch
+        {
+            // Fallback
+        }
+
+        return "¡Hola! Estoy activo monitoreando tu infraestructura y contenedores. Puedes pedirme '/status' o asignarme tareas como 'tarea: [propuesta]' en cualquier momento.";
     }
 
     private async Task ReplyTelegramAsync(string botToken, string chatId, string htmlText, CancellationToken ct)

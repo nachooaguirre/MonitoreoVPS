@@ -1,9 +1,11 @@
-@page "/projects"
+@using Microsoft.EntityFrameworkCore
+@using VpsMonitor.Web.Data
 @using VpsMonitor.Web.Infrastructure.Docker
 @using VpsMonitor.Web.Infrastructure.Ai
 @inject IProjectGroupingService ProjectService
 @inject IDockerReadOnlyClient DockerClient
 @inject IAiDiagnosticsClient AiDiagnostics
+@inject MonitorDbContext Db
 
 <PageTitle>Projects & Workloads — VPS Monitor</PageTitle>
 
@@ -53,10 +55,16 @@ else
                         </span>
                     </div>
 
-                    <div style="display: flex; align-items: center; gap: 1rem; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+                    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1.25rem;">
                         <span>🐳 @proj.ContainerCount @(proj.ContainerCount == 1 ? "contenedor" : "contenedores")</span>
                         <span>•</span>
                         <span>Origen: @proj.AssignmentSource</span>
+                        @if (_taskCountsMap.TryGetValue(proj.ProjectKey, out var taskCount) && taskCount > 0)
+                        {
+                            <span class="badge badge-degraded" style="font-size: 0.75rem; background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.4);">
+                                📋 @taskCount @(taskCount == 1 ? "tarea asignada" : "tareas asignadas")
+                            </span>
+                        }
                     </div>
                 </div>
 
@@ -247,6 +255,7 @@ else
 @code {
     private List<ProjectSummary>? _projects;
     private bool _isLoading = true;
+    private Dictionary<string, int> _taskCountsMap = new(StringComparer.OrdinalIgnoreCase);
 
     private ProjectSummary? _selectedProject;
     private Dictionary<string, DockerContainerStats> _containerStatsMap = new();
@@ -276,10 +285,19 @@ else
             {
                 _selectedProject = _projects.FirstOrDefault(p => p.ProjectKey == _selectedProject.ProjectKey);
             }
+
+            var counts = await Db.ProjectTasks
+                .Where(t => t.Status != "Completed")
+                .GroupBy(t => t.ProjectKey)
+                .Select(g => new { Key = g.Key, Count = g.Count() })
+                .ToListAsync();
+
+            _taskCountsMap = counts.ToDictionary(x => x.Key, x => x.Count, StringComparer.OrdinalIgnoreCase);
         }
         catch
         {
             _projects = new List<ProjectSummary>();
+            _taskCountsMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         }
         finally
         {

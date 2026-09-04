@@ -125,13 +125,17 @@ public sealed class HealthCheckRunner(
         int unhealthyProjects = projectStatuses.Count(p => p.Status == "unhealthy");
 
         string overallStatus = "healthy";
-        if (unhealthyProjects > 0 || activeAlerts.Any(a => string.Equals(a.Severity, "critical", StringComparison.OrdinalIgnoreCase)))
+        if (unhealthyProjects > 0 || unhealthyContainers > 0 || activeAlerts.Any(a => string.Equals(a.Severity, "critical", StringComparison.OrdinalIgnoreCase)))
         {
             overallStatus = "unhealthy";
         }
-        else if (degradedProjects > 0 || activeAlerts.Any(a => string.Equals(a.Severity, "warning", StringComparison.OrdinalIgnoreCase)))
+        else if (degradedProjects > projects.Count / 2)
         {
             overallStatus = "degraded";
+        }
+        else
+        {
+            overallStatus = "healthy";
         }
 
         return new HealthSummaryReport(

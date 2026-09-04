@@ -163,6 +163,7 @@ public static class VpsMonitorApp
                     CREATE TABLE IF NOT EXISTS ""ProjectTasks"" (
                         ""Id"" uuid NOT NULL PRIMARY KEY,
                         ""ProjectKey"" character varying(120) NOT NULL,
+                        ""ContainerName"" character varying(120) NOT NULL DEFAULT '',
                         ""Title"" character varying(200) NOT NULL,
                         ""Description"" text NOT NULL,
                         ""Priority"" character varying(30) NOT NULL,
@@ -172,6 +173,7 @@ public static class VpsMonitorApp
                         ""CreatedAtUtc"" timestamp with time zone NOT NULL,
                         ""CompletedAtUtc"" timestamp with time zone NULL
                     );
+                    ALTER TABLE ""ProjectTasks"" ADD COLUMN IF NOT EXISTS ""ContainerName"" character varying(120) NOT NULL DEFAULT '';
                     CREATE INDEX IF NOT EXISTS ""IX_ProjectTasks_ProjectKey"" ON ""ProjectTasks"" (""ProjectKey"");
 
                     CREATE TABLE IF NOT EXISTS ""TelegramConfigs"" (

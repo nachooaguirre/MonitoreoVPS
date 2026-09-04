@@ -18,13 +18,49 @@
     </div>
 </div>
 
-<!-- Raw Proposal Input Card -->
+<!-- Raw Proposal Input Card with Manual Controls -->
 <div class="card" style="margin-bottom: 1.5rem; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(99, 102, 241, 0.3); padding: 1.5rem; border-radius: 12px;">
     <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.75rem; color: #fff;">💡 Crear Tarea o Procesar Propuesta de Cliente con IA</h3>
     <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
-        Pega notas de reuniones, transcripciones o mensajes de clientes. La IA identificará el proyecto de tu infraestructura, clasificará la prioridad y creará la hoja de ruta con el plan de acción.
+        Pega notas de reuniones, transcripciones o mensajes de clientes. La IA identificará el proyecto y contenedor de tu infraestructura, o puedes seleccionarlo manualmente.
     </p>
-    <textarea @bind="_rawInput" placeholder="Ej. El cliente de SuperPOS me pidió agregar soporte para factura electrónica AFIP y exportador contable en Excel..." rows="3" style="width: 100%; padding: 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.9rem; margin-bottom: 1rem; outline: none; resize: vertical;"></textarea>
+
+    <!-- Manual Selectors Row -->
+    <div style="display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+        <div style="flex: 1; min-width: 220px;">
+            <label style="display: block; font-size: 0.75rem; color: #94a3b8; margin-bottom: 0.25rem;">Proyecto Destino (Opcional - La IA auto-detecta):</label>
+            <select @bind="_overrideProjectKey" style="width: 100%; padding: 0.5rem 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.85rem; outline: none;">
+                <option value="">🤖 Auto-detectar por IA</option>
+                @if (_availableProjects != null)
+                {
+                    @foreach (var p in _availableProjects)
+                    {
+                        <option value="@p.ProjectKey">📦 @p.DisplayName (@p.ProjectKey)</option>
+                    }
+                }
+            </select>
+        </div>
+
+        <div style="flex: 1; min-width: 220px;">
+            <label style="display: block; font-size: 0.75rem; color: #94a3b8; margin-bottom: 0.25rem;">Contenedor Destino (Opcional):</label>
+            <select @bind="_overrideContainerName" style="width: 100%; padding: 0.5rem 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.85rem; outline: none;">
+                <option value="">🐳 Todos los contenedores / Auto-detectar</option>
+                @if (_availableProjects != null)
+                {
+                    @foreach (var p in _availableProjects)
+                    {
+                        @foreach (var c in p.Containers)
+                        {
+                            <option value="@c.Name">@p.DisplayName ➔ @c.Name</option>
+                        }
+                    }
+                }
+            </select>
+        </div>
+    </div>
+
+    <textarea @bind="_rawInput" placeholder="Ej. El cliente de SuperPOS me pidió agregar factura electrónica AFIP en el contenedor api..." rows="3" style="width: 100%; padding: 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.9rem; margin-bottom: 1rem; outline: none; resize: vertical;"></textarea>
+    
     <div style="display: flex; justify-content: flex-end;">
         <button type="button" class="btn-primary" style="padding: 0.55rem 1.25rem; font-size: 0.85rem;" @onclick="CreatePlannedTaskAsync" disabled="@(_isPlanning || string.IsNullOrWhiteSpace(_rawInput))">
             @if (_isPlanning)
@@ -72,10 +108,16 @@ else
             <div class="card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 1.25rem;">
                 <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 0.75rem;">
                     <div>
-                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem;">
                             <span class="badge badge-healthy" style="font-size: 0.75rem; background: rgba(99, 102, 241, 0.2); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.4);">
                                 📦 Proyecto: @task.ProjectKey
                             </span>
+                            @if (!string.IsNullOrWhiteSpace(task.ContainerName))
+                            {
+                                <span class="badge badge-healthy" style="font-size: 0.75rem; background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4);">
+                                    🐳 Contenedor: @task.ContainerName
+                                </span>
+                            }
                             <span class="badge @GetPriorityBadge(task.Priority)" style="font-size: 0.7rem;">
                                 @task.Priority
                             </span>
@@ -126,8 +168,12 @@ else
 
 @code {
     private List<ProjectTask> _tasks = new();
+    private List<ProjectSummary>? _availableProjects;
     private bool _isLoading = true;
+
     private string _rawInput = "";
+    private string _overrideProjectKey = "";
+    private string _overrideContainerName = "";
     private bool _isPlanning;
     private string _selectedStatusFilter = "All";
 
@@ -142,6 +188,14 @@ else
     protected override async Task OnInitializedAsync()
     {
         await LoadTasksAsync();
+        try
+        {
+            _availableProjects = await ProjectService.GetProjectsAsync();
+        }
+        catch
+        {
+            _availableProjects = new List<ProjectSummary>();
+        }
     }
 
     private async Task LoadTasksAsync()
@@ -168,13 +222,17 @@ else
 
         try
         {
-            var projects = await ProjectService.GetProjectsAsync();
+            var projects = _availableProjects ?? await ProjectService.GetProjectsAsync();
             var planned = await AiPlanner.PlanTaskFromProposalAsync(_rawInput, projects);
+
+            var finalProjectKey = !string.IsNullOrWhiteSpace(_overrideProjectKey) ? _overrideProjectKey : planned.ProjectKey;
+            var finalContainerName = !string.IsNullOrWhiteSpace(_overrideContainerName) ? _overrideContainerName : planned.ContainerName;
 
             var newTask = new ProjectTask
             {
                 Id = Guid.NewGuid(),
-                ProjectKey = planned.ProjectKey,
+                ProjectKey = finalProjectKey,
+                ContainerName = finalContainerName,
                 Title = planned.Title,
                 Description = planned.Description,
                 Priority = planned.Priority,
@@ -188,6 +246,8 @@ else
             await Db.SaveChangesAsync();
 
             _rawInput = "";
+            _overrideProjectKey = "";
+            _overrideContainerName = "";
             await LoadTasksAsync();
         }
         catch
@@ -236,4 +296,5 @@ else
         "high" => "badge-degraded",
         _ => "badge-healthy"
     };
+}
 }
