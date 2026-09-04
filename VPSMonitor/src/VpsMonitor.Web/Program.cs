@@ -122,12 +122,17 @@ public static class VpsMonitorApp
         var db = scope.ServiceProvider.GetRequiredService<MonitorDbContext>();
         await db.Database.MigrateAsync();
 
-        if (await db.MonitorUsers.AnyAsync(user => user.Role == MonitorUserRole.Owner))
+        var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+        var existingOwner = await db.MonitorUsers.FirstOrDefaultAsync(user => user.Role == MonitorUserRole.Owner);
+
+        if (existingOwner is not null)
         {
+            existingOwner.Username = ownerUsername.Trim();
+            existingOwner.PasswordHash = passwordHasher.Hash(ownerPassword);
+            await db.SaveChangesAsync();
             return;
         }
 
-        var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
         db.MonitorUsers.Add(new MonitorUser
         {
             Id = Guid.NewGuid(),
