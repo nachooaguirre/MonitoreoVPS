@@ -35,15 +35,18 @@ public sealed class AiDiagnosticsClient : IAiDiagnosticsClient
             var prompt = BuildDiagnosticPrompt(report);
             var requestBody = new
             {
-                model = _configuration["Ai:Model"] ?? "gpt-4.1-mini",
+                model = _configuration["Ai:Model"] ?? "deepseek-ai/deepseek-r1",
                 messages = new[]
                 {
-                    new { role = "system", content = "Eres un asistente experto en SRE y DevOps. Analiza el informe de estado del VPS y genera un diagnóstico claro con acciones recomendadas." },
+                    new { role = "system", content = "Eres un ingeniero experto en SRE y DevOps. Analiza la infraestructura del VPS, salud de contenedores y métricas, y provee un diagnóstico conciso con 3 recomendaciones prácticas." },
                     new { role = "user", content = prompt }
-                }
+                },
+                temperature = 0.6,
+                max_tokens = 1024
             };
 
-            using var response = await _httpClient.PostAsJsonAsync("v1/chat/completions", requestBody, ct);
+            var requestUrl = "chat/completions";
+            using var response = await _httpClient.PostAsJsonAsync(requestUrl, requestBody, ct);
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("AI Diagnostics request returned status code {StatusCode}", response.StatusCode);

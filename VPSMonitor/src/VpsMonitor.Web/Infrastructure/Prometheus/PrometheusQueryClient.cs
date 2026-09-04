@@ -54,12 +54,28 @@ public sealed class PrometheusQueryClient : IPrometheusQueryClient
             var cpu = await cpuTask;
             if (cpu is null)
             {
-                cpu = await QueryScalarAsync("100 - (avg(irate(node_cpu_seconds_total{mode=\"idle\"}[1m])) * 100)", ct);
+                cpu = await QueryScalarAsync("100 - (avg(irate(node_cpu_seconds_total{mode=\"idle\"}[1m])) * 100)", ct)
+                   ?? await QueryScalarAsync("100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[30s])) * 100)", ct);
             }
 
             var mem = await memTask;
+            if (mem is null)
+            {
+                mem = await QueryScalarAsync("(sum(node_memory_MemTotal_bytes) - sum(node_memory_MemFree_bytes)) / sum(node_memory_MemTotal_bytes) * 100", ct);
+            }
+
             var disk = await diskTask;
+            if (disk is null)
+            {
+                disk = await QueryScalarAsync("100 - (sum(node_filesystem_avail_bytes{mountpoint=\"/\"}) / sum(node_filesystem_size_bytes{mountpoint=\"/\"}) * 100)", ct);
+            }
+
             var net = await netTask;
+            if (net is null)
+            {
+                net = await QueryScalarAsync("sum(rate(container_network_receive_bytes_total[1m])) + sum(rate(container_network_transmit_bytes_total[1m]))", ct);
+            }
+
             var uptime = await uptimeTask;
 
             if (cpu is null && mem is null && disk is null && net is null && uptime is null)

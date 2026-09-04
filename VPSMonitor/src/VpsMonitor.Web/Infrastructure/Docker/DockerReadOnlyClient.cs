@@ -8,6 +8,7 @@ public interface IDockerReadOnlyClient
 {
     Task<List<DockerContainerInfo>> ListContainersAsync(CancellationToken ct = default);
     Task<DockerContainerStats?> GetContainerStatsAsync(string containerId, CancellationToken ct = default);
+    Task<string> GetContainerLogsAsync(string containerId, int tail = 100, CancellationToken ct = default);
 }
 
 public sealed class DockerReadOnlyClient : IDockerReadOnlyClient
@@ -127,6 +128,39 @@ public sealed class DockerReadOnlyClient : IDockerReadOnlyClient
         {
             _logger.LogWarning(ex, "Failed to get stats for container {ContainerId}", containerId);
             return null;
+        }
+    }
+
+    public async Task<string> GetContainerLogsAsync(string containerId, int tail = 100, CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"containers/{containerId}/logs?stdout=1&stderr=1&tail={tail}", ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                return $"Error de logs (HTTP {(int)response.StatusCode})";
+            }
+
+            var rawLogs = await response.Content.ReadAsStringAsync(ct);
+            var sb = new System.Text.StringBuilder();
+            var lines = rawLogs.Split('\n');
+            foreach (var line in lines)
+            {
+                if (line.Length > 8 && (line[0] == 1 || line[0] == 2))
+                {
+                    sb.AppendLine(line[8..]);
+                }
+                else
+                {
+                    sb.AppendLine(line);
+                }
+            }
+            return sb.ToString();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to get logs for container {ContainerId}", containerId);
+            return "Error al recuperar logs del contenedor.";
         }
     }
 

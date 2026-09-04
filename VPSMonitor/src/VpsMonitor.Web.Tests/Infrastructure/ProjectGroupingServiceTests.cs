@@ -23,6 +23,11 @@ public class ProjectGroupingServiceTests
         {
             return Task.FromResult<DockerContainerStats?>(null);
         }
+
+        public Task<string> GetContainerLogsAsync(string containerId, int tail = 100, CancellationToken ct = default)
+        {
+            return Task.FromResult("Fake logs");
+        }
     }
 
     [Fact]

@@ -88,12 +88,14 @@ public sealed class HealthCheckRunner(
                 issues.Add($"Alerta [{alert.Severity}]: {desc}");
             }
 
+            bool hasRestartingOrAlerts = projAlerts.Any() || proj.Containers.Any(c => string.Equals(c.State, "restarting", StringComparison.OrdinalIgnoreCase));
+
             string projectStatus;
             if (projUnhealthy > 0 || projAlerts.Any(a => string.Equals(a.Severity, "critical", StringComparison.OrdinalIgnoreCase)))
             {
                 projectStatus = "unhealthy";
             }
-            else if (issues.Count > 0 || projRunning < proj.ContainerCount)
+            else if (hasRestartingOrAlerts)
             {
                 projectStatus = "degraded";
             }

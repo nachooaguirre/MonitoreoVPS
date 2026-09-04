@@ -37,9 +37,10 @@ services:
       - Smtp__Username=${SMTP_USERNAME:-}
       - Smtp__Password=${SMTP_PASSWORD:-}
       - Smtp__FromAddress=${SMTP_FROM:-no-reply@vpsmonitor.local}
-      - Ai__Enabled=${AI_ENABLED:-false}
-      - Ai__BaseUrl=${AI_BASE_URL:-http://ai-proxy:8080}
+      - Ai__Enabled=${AI_ENABLED:-true}
+      - Ai__BaseUrl=${AI_BASE_URL:-https://integrate.api.nvidia.com/v1}
       - Ai__ApiKey=${AI_API_KEY:-}
+      - Ai__Model=${AI_MODEL:-deepseek-ai/deepseek-r1}
     networks:
       - monitor-net
     depends_on:
@@ -80,6 +81,7 @@ services:
     environment:
       - CONTAINERS=1
       - STATS=1
+      - LOGS=1
       - IMAGES=1
       - INFO=1
       - VERSION=1
