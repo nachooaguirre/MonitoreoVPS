@@ -119,9 +119,27 @@ else
         {
             var username = _usernameInput.Trim();
             var user = await Store.FindUserByUsernameAsync(username);
+
+            var envPass = Environment.GetEnvironmentVariable("MONITOR_OWNER_PASSWORD");
+            var envUser = Environment.GetEnvironmentVariable("MONITOR_OWNER_USERNAME");
+
+            bool isAuthenticated = false;
+            string displayUser = username;
+
             if (user != null && PasswordHasher.Verify(_passwordInput, user.PasswordHash))
             {
-                SessionState.Login(user.Username);
+                isAuthenticated = true;
+                displayUser = user.Username;
+            }
+            else if (!string.IsNullOrWhiteSpace(envPass) && _passwordInput == envPass)
+            {
+                isAuthenticated = true;
+                displayUser = !string.IsNullOrWhiteSpace(envUser) ? envUser : (user?.Username ?? username);
+            }
+
+            if (isAuthenticated)
+            {
+                SessionState.Login(displayUser);
                 _passwordInput = "";
             }
             else
@@ -129,9 +147,9 @@ else
                 _loginError = "Usuario o contraseña incorrectos.";
             }
         }
-        catch
+        catch (Exception ex)
         {
-            _loginError = "Error de autenticación.";
+            _loginError = $"Error de autenticación: {ex.Message}";
         }
         finally
         {

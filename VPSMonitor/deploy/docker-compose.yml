@@ -17,6 +17,8 @@ services:
       dockerfile: Dockerfile
     container_name: vps-monitor-gateway
     restart: unless-stopped
+    env_file:
+      - .env
     ports:
       - "${MONITOR_PORT:-5080}:5080"
     environment:
