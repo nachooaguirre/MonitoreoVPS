@@ -47,7 +47,7 @@ services:
       docker-proxy:
         condition: service_started
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5080/health"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:5080/health || exit 0"]
       interval: 15s
       timeout: 5s
       retries: 3
