@@ -120,7 +120,19 @@ public static class VpsMonitorApp
 
         await using var scope = app.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<MonitorDbContext>();
-        await db.Database.EnsureCreatedAsync();
+        
+        var databaseCreator = Microsoft.EntityFrameworkCore.Infrastructure.AccessorExtensions.GetService<Microsoft.EntityFrameworkCore.Storage.IRelationalDatabaseCreator>(db.Database);
+        if (databaseCreator is not null)
+        {
+            if (!await databaseCreator.ExistsAsync())
+            {
+                await databaseCreator.CreateAsync();
+            }
+            if (!await databaseCreator.HasTablesAsync())
+            {
+                await databaseCreator.CreateTablesAsync();
+            }
+        }
 
         var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
         var existingOwner = await db.MonitorUsers.FirstOrDefaultAsync(user => user.Role == MonitorUserRole.Owner);
