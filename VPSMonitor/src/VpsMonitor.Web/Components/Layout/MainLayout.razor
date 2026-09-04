@@ -34,7 +34,7 @@
                     <input type="password" @bind="_passwordInput" placeholder="••••••••" required style="width: 100%; padding: 0.75rem 1rem; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; color: #fff; font-size: 0.9rem; outline: none;" />
                 </div>
 
-                <button type="submit" disabled="@_isAuthenticating" style="width: 100%; padding: 0.85rem; background: linear-gradient(135deg, #6366f1, #4f46e5); border: none; border-radius: 8px; color: #fff; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: all 0.2s;">
+                <button type="button" @onclick="HandleLoginAsync" disabled="@_isAuthenticating" style="width: 100%; padding: 0.85rem; background: linear-gradient(135deg, #6366f1, #4f46e5); border: none; border-radius: 8px; color: #fff; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: all 0.2s;">
                     @if (_isAuthenticating)
                     {
                         <span>Verificando...</span>
