@@ -21,6 +21,7 @@ services:
       - "${MONITOR_PORT:-5080}:5080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_HTTP_PORTS=5080
       - ASPNETCORE_URLS=http://0.0.0.0:5080
       - ConnectionStrings__Default=Host=postgres;Port=5432;Database=${POSTGRES_DB:-vps_monitor};Username=${POSTGRES_USER:-vps_monitor};Password=${POSTGRES_PASSWORD:-vps_monitor_secret}
       - MONITOR_OWNER_USERNAME=${MONITOR_OWNER_USERNAME:-admin}
