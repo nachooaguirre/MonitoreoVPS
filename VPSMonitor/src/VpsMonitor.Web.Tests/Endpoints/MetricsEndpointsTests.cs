@@ -87,6 +87,11 @@ public class MetricsEndpointsTests
         {
             return Task.CompletedTask;
         }
+
+        public Task SetContainerAliasAsync(string containerIdOrName, string alias, CancellationToken ct = default)
+        {
+            return Task.CompletedTask;
+        }
     }
 
     private async Task<(WebApplication App, HttpClient Client, string OwnerCookie)> CreateTestAppAsync()

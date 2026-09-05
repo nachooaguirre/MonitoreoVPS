@@ -7,6 +7,7 @@
 @inject IPasswordHasher PasswordHasher
 @inject SessionService SessionService
 @inject IHttpContextAccessor HttpContextAccessor
+@inject IJSRuntime JS
 @implements IDisposable
 
 @if (!SessionState.IsAuthenticated)
@@ -147,6 +148,26 @@ else
         }
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !SessionState.IsAuthenticated)
+        {
+            try
+            {
+                var savedUser = await JS.InvokeAsync<string?>("localStorage.getItem", "vps_monitor_user");
+                if (!string.IsNullOrWhiteSpace(savedUser))
+                {
+                    SessionState.Login(savedUser);
+                    StateHasChanged();
+                }
+            }
+            catch
+            {
+                // JS interop fallback
+            }
+        }
+    }
+
     public void Dispose()
     {
         SessionState.OnChange -= StateHasChanged;
@@ -202,6 +223,14 @@ else
                 }
 
                 SessionState.Login(displayUser);
+                try
+                {
+                    await JS.InvokeVoidAsync("localStorage.setItem", "vps_monitor_user", displayUser);
+                }
+                catch
+                {
+                    // ignore
+                }
                 _passwordInput = "";
             }
             else
@@ -219,8 +248,17 @@ else
         }
     }
 
-    private void Logout()
+    private async Task Logout()
     {
+        try
+        {
+            await JS.InvokeVoidAsync("localStorage.removeItem", "vps_monitor_user");
+        }
+        catch
+        {
+            // ignore
+        }
+
         try
         {
             var httpContext = HttpContextAccessor.HttpContext;

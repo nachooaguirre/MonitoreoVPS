@@ -10,6 +10,7 @@ public sealed class MonitorDbContext(DbContextOptions<MonitorDbContext> options)
     public DbSet<MonitorSession> MonitorSessions => Set<MonitorSession>();
     public DbSet<ProjectAssignment> ProjectAssignments => Set<ProjectAssignment>();
     public DbSet<ProjectAlias> ProjectAliases => Set<ProjectAlias>();
+    public DbSet<ContainerAlias> ContainerAliases => Set<ContainerAlias>();
     public DbSet<HealthCheckDefinition> HealthCheckDefinitions => Set<HealthCheckDefinition>();
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
     public DbSet<ProjectTask> ProjectTasks => Set<ProjectTask>();
@@ -83,6 +84,14 @@ public sealed class MonitorDbContext(DbContextOptions<MonitorDbContext> options)
             entity.Property(pa => pa.ProjectKey).HasMaxLength(120).IsRequired();
             entity.Property(pa => pa.Alias).HasMaxLength(120).IsRequired();
             entity.HasIndex(pa => pa.ProjectKey).IsUnique();
+        });
+
+        modelBuilder.Entity<ContainerAlias>(entity =>
+        {
+            entity.HasKey(ca => ca.Id);
+            entity.Property(ca => ca.ContainerIdOrName).HasMaxLength(120).IsRequired();
+            entity.Property(ca => ca.Alias).HasMaxLength(120).IsRequired();
+            entity.HasIndex(ca => ca.ContainerIdOrName).IsUnique();
         });
 
         modelBuilder.Entity<HealthCheckDefinition>(entity =>

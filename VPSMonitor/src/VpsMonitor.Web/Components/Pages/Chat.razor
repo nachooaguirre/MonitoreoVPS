@@ -180,10 +180,17 @@
 
         try
         {
-            // Check if this user message is a task assignment request
-            if (IsTaskIntent(text))
+            var projects = await ProjectService.GetProjectsAsync();
+            var tasks = await Db.ProjectTasks.OrderByDescending(t => t.CreatedAtUtc).ToListAsync();
+
+            // Check if user is asking to rename an alias
+            var aliasResult = await TryProcessAliasIntentAsync(text, projects);
+            if (aliasResult != null)
             {
-                var projects = await ProjectService.GetProjectsAsync();
+                _chatHistory.Add(new WebChatMessage("assistant", aliasResult));
+            }
+            else if (IsTaskIntent(text))
+            {
                 var planned = await AiPlanner.PlanTaskFromProposalAsync(text, projects);
 
                 var newTask = new ProjectTask
@@ -221,7 +228,7 @@
                 var health = _healthSummary ?? await HealthRunner.GetHealthSummaryAsync();
                 var metrics = _vpsMetrics ?? await PrometheusClient.GetVpsMetricsAsync();
 
-                var reply = await AiDiagnostics.ChatAsync(text, _chatHistory, health, metrics);
+                var reply = await AiDiagnostics.ChatAsync(text, _chatHistory, health, metrics, projects, tasks);
                 _chatHistory.Add(new WebChatMessage("assistant", reply));
             }
         }
@@ -235,11 +242,60 @@
         }
     }
 
+    private async Task<string?> TryProcessAliasIntentAsync(string text, List<ProjectSummary> projects)
+    {
+        var lower = text.ToLowerInvariant();
+        if (!lower.Contains("renombrar") && !lower.Contains("renombra") && !lower.Contains("alias") && !lower.Contains("cambiar nombre") && !lower.Contains("cambia el nombre"))
+        {
+            return null;
+        }
+
+        foreach (var p in projects)
+        {
+            if (lower.Contains(p.ProjectKey.ToLowerInvariant()) || (!string.IsNullOrWhiteSpace(p.DisplayName) && lower.Contains(p.DisplayName.ToLowerInvariant())))
+            {
+                var idx = lower.IndexOf(" a ") >= 0 ? lower.IndexOf(" a ") + 3 :
+                          lower.IndexOf(" por ") >= 0 ? lower.IndexOf(" por ") + 5 : -1;
+                if (idx > 0 && idx < text.Length)
+                {
+                    var newAlias = text.Substring(idx).Trim(' ', '"', '\'', '.');
+                    if (!string.IsNullOrWhiteSpace(newAlias))
+                    {
+                        await ProjectService.SetProjectAliasAsync(p.ProjectKey, newAlias);
+                        return $"✅ Proyecto `{p.ProjectKey}` renombrado exitosamente con el alias **{newAlias}**.";
+                    }
+                }
+            }
+
+            foreach (var c in p.Containers)
+            {
+                var cleanName = c.Name.TrimStart('/');
+                if (lower.Contains(c.Id.ToLowerInvariant()) || lower.Contains(c.Name.ToLowerInvariant()) || lower.Contains(cleanName.ToLowerInvariant()))
+                {
+                    var idx = lower.IndexOf(" a ") >= 0 ? lower.IndexOf(" a ") + 3 :
+                              lower.IndexOf(" por ") >= 0 ? lower.IndexOf(" por ") + 5 : -1;
+                    if (idx > 0 && idx < text.Length)
+                    {
+                        var newAlias = text.Substring(idx).Trim(' ', '"', '\'', '.');
+                        if (!string.IsNullOrWhiteSpace(newAlias))
+                        {
+                            await ProjectService.SetContainerAliasAsync(c.Name, newAlias);
+                            return $"✅ Contenedor `{cleanName}` renombrado exitosamente con el alias **{newAlias}**.";
+                        }
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
     private static bool IsTaskIntent(string text)
     {
         var lower = text.ToLowerInvariant();
-        return lower.Contains("tarea") || lower.Contains("crear") || lower.Contains("asignar") ||
-               lower.Contains("cliente me pidió") || lower.Contains("agregar") || lower.Contains("hacer cambios");
+        return lower.StartsWith("tarea:") || lower.StartsWith("planificar:") || lower.StartsWith("propuesta:") ||
+               lower.StartsWith("asigna la tarea") || lower.StartsWith("crear tarea") || lower.StartsWith("asignar tarea") ||
+               lower.Contains("cliente me pidió realizar") || lower.Contains("asigna esta tarea:");
     }
 
     private void ClearChat()

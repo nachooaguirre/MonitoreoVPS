@@ -10,6 +10,7 @@ public interface IProjectGroupingService
     Task<List<ProjectSummary>> GetProjectsAsync(CancellationToken ct = default);
     Task<ProjectSummary?> GetProjectAsync(string projectKey, CancellationToken ct = default);
     Task SetProjectAliasAsync(string projectKey, string alias, CancellationToken ct = default);
+    Task SetContainerAliasAsync(string containerIdOrName, string alias, CancellationToken ct = default);
 }
 
 public sealed class ProjectGroupingService : IProjectGroupingService
@@ -26,9 +27,10 @@ public sealed class ProjectGroupingService : IProjectGroupingService
     public async Task<List<ProjectSummary>> GetProjectsAsync(CancellationToken ct = default)
     {
         var containers = await _dockerClient.ListContainersAsync(ct);
-        var grouped = containers.GroupBy(c => c.ProjectKey);
 
-        var aliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var projectAliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var containerAliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
         if (_scopeFactory != null)
         {
             try
@@ -37,7 +39,8 @@ public sealed class ProjectGroupingService : IProjectGroupingService
                 var db = scope.ServiceProvider.GetService<MonitorDbContext>();
                 if (db != null)
                 {
-                    aliases = await db.ProjectAliases.ToDictionaryAsync(a => a.ProjectKey, a => a.Alias, StringComparer.OrdinalIgnoreCase, ct);
+                    projectAliases = await db.ProjectAliases.ToDictionaryAsync(a => a.ProjectKey, a => a.Alias, StringComparer.OrdinalIgnoreCase, ct);
+                    containerAliases = await db.ContainerAliases.ToDictionaryAsync(a => a.ContainerIdOrName, a => a.Alias, StringComparer.OrdinalIgnoreCase, ct);
                 }
             }
             catch
@@ -46,7 +49,36 @@ public sealed class ProjectGroupingService : IProjectGroupingService
             }
         }
 
+        // Apply container aliases
+        var enrichedContainers = containers.Select(c =>
+        {
+            string containerDisplayName = c.Name;
+            if (containerAliases.TryGetValue(c.Name, out var aliasByName) && !string.IsNullOrWhiteSpace(aliasByName))
+            {
+                containerDisplayName = aliasByName;
+            }
+            else if (containerAliases.TryGetValue(c.Id, out var aliasById) && !string.IsNullOrWhiteSpace(aliasById))
+            {
+                containerDisplayName = aliasById;
+            }
+
+            return new DockerContainerInfo(
+                Id: c.Id,
+                Name: c.Name,
+                Image: c.Image,
+                Labels: c.Labels,
+                State: c.State,
+                Status: c.Status,
+                Created: c.Created,
+                RestartCount: c.RestartCount,
+                ProjectKey: c.ProjectKey,
+                DisplayName: containerDisplayName
+            );
+        }).ToList();
+
+        var grouped = enrichedContainers.GroupBy(c => c.ProjectKey);
         var results = new List<ProjectSummary>();
+
         foreach (var group in grouped)
         {
             var projectContainers = group.ToList();
@@ -54,7 +86,7 @@ public sealed class ProjectGroupingService : IProjectGroupingService
             var overallStatus = CalculateOverallStatus(projectContainers);
             var totalRestarts = projectContainers.Sum(c => c.RestartCount);
 
-            string displayName = aliases.TryGetValue(group.Key, out var aliasVal) && !string.IsNullOrWhiteSpace(aliasVal)
+            string displayName = projectAliases.TryGetValue(group.Key, out var aliasVal) && !string.IsNullOrWhiteSpace(aliasVal)
                 ? aliasVal
                 : group.Key;
 
@@ -92,6 +124,33 @@ public sealed class ProjectGroupingService : IProjectGroupingService
             {
                 Id = Guid.NewGuid(),
                 ProjectKey = projectKey,
+                Alias = alias.Trim(),
+                UpdatedAtUtc = DateTime.UtcNow
+            });
+        }
+        else
+        {
+            existing.Alias = alias.Trim();
+            existing.UpdatedAtUtc = DateTime.UtcNow;
+        }
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task SetContainerAliasAsync(string containerIdOrName, string alias, CancellationToken ct = default)
+    {
+        if (_scopeFactory == null) return;
+
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MonitorDbContext>();
+
+        var existing = await db.ContainerAliases.FirstOrDefaultAsync(ca => ca.ContainerIdOrName == containerIdOrName, ct);
+        if (existing == null)
+        {
+            db.ContainerAliases.Add(new ContainerAlias
+            {
+                Id = Guid.NewGuid(),
+                ContainerIdOrName = containerIdOrName,
                 Alias = alias.Trim(),
                 UpdatedAtUtc = DateTime.UtcNow
             });

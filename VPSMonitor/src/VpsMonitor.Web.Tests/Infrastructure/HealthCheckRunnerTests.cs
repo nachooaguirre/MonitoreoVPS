@@ -42,6 +42,11 @@ public class HealthCheckRunnerTests
         {
             return Task.CompletedTask;
         }
+
+        public Task SetContainerAliasAsync(string containerIdOrName, string alias, CancellationToken ct = default)
+        {
+            return Task.CompletedTask;
+        }
     }
 
     private class FakePrometheusQueryClient : IPrometheusQueryClient

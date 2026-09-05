@@ -2,10 +2,12 @@
 @using VpsMonitor.Web.Infrastructure.Health
 @using VpsMonitor.Web.Infrastructure.Prometheus
 @using VpsMonitor.Web.Infrastructure.Ai
+@using VpsMonitor.Web.Infrastructure.Docker
 @implements IDisposable
 @inject IHealthCheckRunner HealthRunner
 @inject IPrometheusQueryClient PrometheusClient
 @inject IAiDiagnosticsClient AiDiagnostics
+@inject IProjectGroupingService ProjectService
 
 <PageTitle>Overview — VPS Monitor</PageTitle>
 
@@ -236,11 +238,74 @@ else
             }
         </div>
     </div>
+
+    <!-- Top Containers Inventory & Restarts Ranking (Grafana Style) -->
+    <div class="card" style="margin-top: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="font-size: 1.1rem; color: #f8fafc; margin: 0;">🐳 Top Contenedores y Alias de Proyecto</h3>
+            <span style="font-size: 0.8rem; color: #94a3b8;">Total: @_projects.Sum(p => p.Containers.Count) contenedores monitoreados</span>
+        </div>
+        <div style="overflow-x: auto;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Contenedor / Alias</th>
+                        <th>Proyecto</th>
+                        <th>Estado</th>
+                        <th>Reinicio(s)</th>
+                        <th>ID Contenedor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (_projects.Any(p => p.Containers.Any()))
+                    {
+                        @foreach (var c in _projects.SelectMany(p => p.Containers).OrderByDescending(c => c.RestartCount).ThenBy(c => c.Name).Take(15))
+                        {
+                            <tr>
+                                <td>
+                                    <div><strong>@(string.IsNullOrWhiteSpace(c.DisplayName) ? c.Name : c.DisplayName)</strong></div>
+                                    @if (!string.IsNullOrWhiteSpace(c.DisplayName) && c.DisplayName != c.Name)
+                                    {
+                                        <div style="font-size: 0.75rem; color: var(--text-muted);">Docker Name: @c.Name</div>
+                                    }
+                                </td>
+                                <td>
+                                    <span style="font-size: 0.85rem; color: #a5b4fc; background: rgba(99, 102, 241, 0.12); padding: 0.2rem 0.5rem; border-radius: 4px;">
+                                        @c.ProjectKey
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge @GetBadgeClass(c.State)">
+                                        @c.State.ToUpper()
+                                    </span>
+                                </td>
+                                <td>
+                                    <strong style="color: @(c.RestartCount > 0 ? "#f87171" : "#34d399");">
+                                        @c.RestartCount
+                                    </strong>
+                                </td>
+                                <td>
+                                    <code style="font-size: 0.75rem; color: #94a3b8;">@(c.Id.Length >= 12 ? c.Id[..12] : c.Id)</code>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="5" style="text-align: center; color: var(--text-muted);">No se detectaron contenedores activos</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
 }
 
 @code {
     private VpsMetrics? _vpsMetrics;
     private HealthSummaryReport? _healthSummary;
+    private List<ProjectSummary> _projects = new();
     private bool _isLoading = true;
     private string? _aiReport;
     private bool _isAnalyzingAi;
@@ -265,6 +330,7 @@ else
         {
             _vpsMetrics = await PrometheusClient.GetVpsMetricsAsync();
             _healthSummary = await HealthRunner.GetHealthSummaryAsync();
+            _projects = await ProjectService.GetProjectsAsync();
         }
         catch
         {

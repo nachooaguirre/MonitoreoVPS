@@ -161,6 +161,14 @@ public static class VpsMonitorApp
                     );
                     CREATE UNIQUE INDEX IF NOT EXISTS ""IX_ProjectAliases_ProjectKey"" ON ""ProjectAliases"" (""ProjectKey"");
 
+                    CREATE TABLE IF NOT EXISTS ""ContainerAliases"" (
+                        ""Id"" uuid NOT NULL PRIMARY KEY,
+                        ""ContainerIdOrName"" character varying(120) NOT NULL,
+                        ""Alias"" character varying(120) NOT NULL,
+                        ""UpdatedAtUtc"" timestamp with time zone NOT NULL
+                    );
+                    CREATE UNIQUE INDEX IF NOT EXISTS ""IX_ContainerAliases_ContainerIdOrName"" ON ""ContainerAliases"" (""ContainerIdOrName"");
+
                     CREATE TABLE IF NOT EXISTS ""ProjectTasks"" (
                         ""Id"" uuid NOT NULL PRIMARY KEY,
                         ""ProjectKey"" character varying(120) NOT NULL,

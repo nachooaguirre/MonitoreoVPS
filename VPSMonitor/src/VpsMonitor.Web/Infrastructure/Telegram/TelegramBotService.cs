@@ -201,16 +201,27 @@ Comandos y funciones disponibles:
             return;
         }
 
+        bool isAliasIntent = textLower.Contains("renombrar") || textLower.Contains("renombra") ||
+                             textLower.Contains("alias") || textLower.Contains("cambiar nombre") || textLower.Contains("cambia el nombre");
+
+        if (isAliasIntent)
+        {
+            var projects = await projectGrouping.GetProjectsAsync(ct);
+            var aliasMsg = await TryProcessAliasIntentAsync(text, projects, projectGrouping, ct);
+            if (aliasMsg != null)
+            {
+                await ReplyTelegramAsync(botToken, chatIdFromMsg, aliasMsg, ct);
+                return;
+            }
+        }
+
         bool isTaskIntent = textLower.StartsWith("tarea:") ||
                             textLower.StartsWith("propuesta:") ||
                             textLower.StartsWith("planificar:") ||
-                            textLower.Contains("asignar") ||
-                            textLower.Contains("asigname") ||
-                            textLower.Contains("asigna") ||
-                            textLower.Contains("tarea") ||
-                            textLower.Contains("propuesta") ||
-                            textLower.Contains("requerimiento") ||
-                            textLower.Contains("cliente");
+                            textLower.StartsWith("asigna la tarea") ||
+                            textLower.StartsWith("crear tarea") ||
+                            textLower.StartsWith("asignar tarea") ||
+                            textLower.Contains("asigna esta tarea:");
 
         if (isTaskIntent)
         {
@@ -255,58 +266,77 @@ Comandos y funciones disponibles:
             return;
         }
 
-        // Generic Conversational Chat handling using DeepSeek-R1
+        // Generic Conversational Chat handling using AI Diagnostics Client with full live context
         var chatReply = await GenerateConversationalReplyAsync(text, scope, ct);
         await ReplyTelegramAsync(botToken, chatIdFromMsg, chatReply, ct);
     }
 
-    private async Task<string> GenerateConversationalReplyAsync(string userMessage, IServiceScope scope, CancellationToken ct)
+    private async Task<string?> TryProcessAliasIntentAsync(string text, List<ProjectSummary> projects, IProjectGroupingService projectGrouping, CancellationToken ct)
     {
-        var enabled = _configuration.GetValue("Ai:Enabled", true);
-        if (!enabled)
+        var lower = text.ToLowerInvariant();
+        foreach (var p in projects)
         {
-            return "¡Hola! Estoy en línea monitoreando tu VPS. ¿En qué te puedo ayudar hoy con tus proyectos o contenedores?";
-        }
-
-        try
-        {
-            var healthRunner = scope.ServiceProvider.GetRequiredService<IHealthCheckRunner>();
-            var health = await healthRunner.GetHealthSummaryAsync(ct);
-
-            var requestBody = new
+            if (lower.Contains(p.ProjectKey.ToLowerInvariant()) || (!string.IsNullOrWhiteSpace(p.DisplayName) && lower.Contains(p.DisplayName.ToLowerInvariant())))
             {
-                model = _configuration["Ai:Model"] ?? "deepseek-ai/deepseek-r1",
-                messages = new[]
+                var idx = lower.IndexOf(" a ") >= 0 ? lower.IndexOf(" a ") + 3 :
+                          lower.IndexOf(" por ") >= 0 ? lower.IndexOf(" por ") + 5 : -1;
+                if (idx > 0 && idx < text.Length)
                 {
-                    new { role = "system", content = $"Eres un asistente virtual de DevOps y SRE conversacional, amable y muy capaz. Respondes brevemente en español. El estado actual de la infraestructura es {health.Status.ToUpper()} con {health.RunningContainers} contenedores activos." },
-                    new { role = "user", content = userMessage }
-                },
-                temperature = 0.7,
-                max_tokens = 512
-            };
+                    var newAlias = text.Substring(idx).Trim(' ', '"', '\'', '.');
+                    if (!string.IsNullOrWhiteSpace(newAlias))
+                    {
+                        await projectGrouping.SetProjectAliasAsync(p.ProjectKey, newAlias, ct);
+                        return $"✅ Proyecto <code>{WebUtilityEncode(p.ProjectKey)}</code> renombrado con éxito a <b>{WebUtilityEncode(newAlias)}</b>.";
+                    }
+                }
+            }
 
-            using var response = await _httpClient.PostAsJsonAsync("chat/completions", requestBody, ct);
-            if (response.IsSuccessStatusCode)
+            foreach (var c in p.Containers)
             {
-                using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
-                var content = doc.RootElement
-                    .GetProperty("choices")[0]
-                    .GetProperty("message")
-                    .GetProperty("content")
-                    .GetString();
-
-                if (!string.IsNullOrWhiteSpace(content))
+                var cleanName = c.Name.TrimStart('/');
+                if (lower.Contains(c.Id.ToLowerInvariant()) || lower.Contains(c.Name.ToLowerInvariant()) || lower.Contains(cleanName.ToLowerInvariant()))
                 {
-                    return WebUtilityEncode(content.Trim());
+                    var idx = lower.IndexOf(" a ") >= 0 ? lower.IndexOf(" a ") + 3 :
+                              lower.IndexOf(" por ") >= 0 ? lower.IndexOf(" por ") + 5 : -1;
+                    if (idx > 0 && idx < text.Length)
+                    {
+                        var newAlias = text.Substring(idx).Trim(' ', '"', '\'', '.');
+                        if (!string.IsNullOrWhiteSpace(newAlias))
+                        {
+                            await projectGrouping.SetContainerAliasAsync(c.Name, newAlias, ct);
+                            return $"✅ Contenedor <code>{WebUtilityEncode(cleanName)}</code> renombrado con éxito a <b>{WebUtilityEncode(newAlias)}</b>.";
+                        }
+                    }
                 }
             }
         }
-        catch
-        {
-            // Fallback
-        }
 
-        return "¡Hola! Estoy activo monitoreando tu infraestructura y contenedores. Puedes pedirme '/status' o asignarme tareas como 'tarea: [propuesta]' en cualquier momento.";
+        return null;
+    }
+
+    private async Task<string> GenerateConversationalReplyAsync(string userMessage, IServiceScope scope, CancellationToken ct)
+    {
+        try
+        {
+            var healthRunner = scope.ServiceProvider.GetRequiredService<IHealthCheckRunner>();
+            var prometheusClient = scope.ServiceProvider.GetRequiredService<IPrometheusQueryClient>();
+            var projectGrouping = scope.ServiceProvider.GetRequiredService<IProjectGroupingService>();
+            var aiDiagnostics = scope.ServiceProvider.GetRequiredService<IAiDiagnosticsClient>();
+            var db = scope.ServiceProvider.GetRequiredService<MonitorDbContext>();
+
+            var health = await healthRunner.GetHealthSummaryAsync(ct);
+            var metrics = await prometheusClient.GetVpsMetricsAsync(ct);
+            var projects = await projectGrouping.GetProjectsAsync(ct);
+            var tasks = await db.ProjectTasks.OrderByDescending(t => t.CreatedAtUtc).ToListAsync(ct);
+
+            var reply = await aiDiagnostics.ChatAsync(userMessage, new List<WebChatMessage>(), health, metrics, projects, tasks, ct);
+            return WebUtilityEncode(reply);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error generating AI response for Telegram");
+            return "¡Hola! Estoy activo monitoreando tu infraestructura y contenedores. ¿En qué te puedo colaborar hoy?";
+        }
     }
 
     private async Task ReplyTelegramAsync(string botToken, string chatId, string htmlText, CancellationToken ct)

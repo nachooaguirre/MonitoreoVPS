@@ -2,8 +2,9 @@ namespace VpsMonitor.Web.Infrastructure.Ai;
 
 using System.Text;
 using System.Text.Json;
+using VpsMonitor.Web.Data.Entities;
+using VpsMonitor.Web.Infrastructure.Docker;
 using VpsMonitor.Web.Infrastructure.Health;
-
 using VpsMonitor.Web.Infrastructure.Prometheus;
 
 public sealed record WebChatMessage(string Role, string Content);
@@ -11,7 +12,7 @@ public sealed record WebChatMessage(string Role, string Content);
 public interface IAiDiagnosticsClient
 {
     Task<string> DiagnosticReportAsync(HealthSummaryReport report, CancellationToken ct = default);
-    Task<string> ChatAsync(string userMessage, List<WebChatMessage> history, HealthSummaryReport health, VpsMetrics? metrics, CancellationToken ct = default);
+    Task<string> ChatAsync(string userMessage, List<WebChatMessage> history, HealthSummaryReport health, VpsMetrics? metrics, List<ProjectSummary>? projects = null, List<ProjectTask>? tasks = null, CancellationToken ct = default);
 }
 
 public sealed class AiDiagnosticsClient : IAiDiagnosticsClient
@@ -104,7 +105,7 @@ public sealed class AiDiagnosticsClient : IAiDiagnosticsClient
         }
     }
 
-    public async Task<string> ChatAsync(string userMessage, List<WebChatMessage> history, HealthSummaryReport health, VpsMetrics? metrics, CancellationToken ct = default)
+    public async Task<string> ChatAsync(string userMessage, List<WebChatMessage> history, HealthSummaryReport health, VpsMetrics? metrics, List<ProjectSummary>? projects = null, List<ProjectTask>? tasks = null, CancellationToken ct = default)
     {
         var enabled = _configuration.GetValue("Ai:Enabled", false);
         if (!enabled)
@@ -114,7 +115,7 @@ public sealed class AiDiagnosticsClient : IAiDiagnosticsClient
 
         try
         {
-            var systemContext = BuildSystemContext(health, metrics);
+            var systemContext = BuildSystemContext(health, metrics, projects, tasks);
             var messagesList = new List<object>
             {
                 new { role = "system", content = systemContext }
@@ -187,12 +188,12 @@ public sealed class AiDiagnosticsClient : IAiDiagnosticsClient
         }
     }
 
-    private static string BuildSystemContext(HealthSummaryReport health, VpsMetrics? metrics)
+    private static string BuildSystemContext(HealthSummaryReport health, VpsMetrics? metrics, List<ProjectSummary>? projects, List<ProjectTask>? tasks)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("Eres un asistente virtual de IA (NVIDIA DeepSeek-R1) integrado en el panel de control de VPS Monitor.");
-        sb.AppendLine("Responde en español de forma amable, natural, profesional y concisa.");
-        sb.AppendLine("Tienes acceso al estado en vivo del servidor VPS:");
+        sb.AppendLine("Eres un asistente virtual experto de IA (NVIDIA DeepSeek) en DevOps, SRE y monitoreo de VPS.");
+        sb.AppendLine("Puedes responder a CUALQUIER pregunta o inquietud del usuario de forma natural, fluida, completa y amable.");
+        sb.AppendLine("Tienes acceso constante a todo el inventario en vivo de la infraestructura:");
         sb.AppendLine($"- Estado global: {health.Status.ToUpper()}");
         sb.AppendLine($"- Proyectos totales: {health.TotalProjects} (Saludables: {health.HealthyProjects}, Degradados: {health.DegradedProjects}, Insaludables: {health.UnhealthyProjects})");
         sb.AppendLine($"- Contenedores: {health.RunningContainers} activos, {health.UnhealthyContainers} fallando, {health.StoppedContainers} detenidos");
@@ -206,20 +207,30 @@ public sealed class AiDiagnosticsClient : IAiDiagnosticsClient
             sb.AppendLine($"- Uptime: {TimeSpan.FromSeconds(metrics.UptimeSeconds).TotalDays:F1} días");
         }
 
-        if (health.ActiveAlerts.Any())
+        if (projects != null && projects.Any())
         {
-            sb.AppendLine("- Alertas Activas:");
-            foreach (var a in health.ActiveAlerts)
+            sb.AppendLine("\n- Proyectos y Contenedores Actuales:");
+            foreach (var p in projects)
             {
-                sb.AppendLine($"  * {a.AlertName} ({a.Severity}): {a.Summary}");
+                sb.AppendLine($"  * Proyecto: {p.DisplayName} (Key: {p.ProjectKey}, Status: {p.OverallStatus})");
+                foreach (var c in p.Containers)
+                {
+                    var aliasStr = !string.IsNullOrWhiteSpace(c.DisplayName) && c.DisplayName != c.Name ? $" [Alias: {c.DisplayName}]" : "";
+                    sb.AppendLine($"    - Contenedor: {c.Name}{aliasStr} (ID: {c.Id[..Math.Min(12, c.Id.Length)]}, Estado: {c.State})");
+                }
             }
         }
-        else
+
+        if (tasks != null && tasks.Any())
         {
-            sb.AppendLine("- Alertas Activas: Ninguna (0 alertas)");
+            sb.AppendLine("\n- Tareas Activas Registradas:");
+            foreach (var t in tasks.Take(10))
+            {
+                sb.AppendLine($"  * [{t.Status}] {t.Title} (Proyecto: {t.ProjectKey}, Prioridad: {t.Priority})");
+            }
         }
 
-        sb.AppendLine("\nSi el usuario pide expresamente crear o planificar una tarea para un proyecto o contenedor, instrúyelo o confirma amablemente.");
+        sb.AppendLine("\nPuedes responder a cualquier consulta sobre el servidor, los contenedores, código, arquitectura, tareas, o realizar conversaciones generales. Si el usuario solicita renombrar o asignar un alias a un contenedor/proyecto, confírmaselo amablemente.");
 
         return sb.ToString();
     }

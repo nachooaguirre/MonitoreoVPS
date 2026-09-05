@@ -9,7 +9,8 @@ public sealed record DockerContainerInfo(
     string Status,
     long Created,
     int RestartCount,
-    string ProjectKey
+    string ProjectKey,
+    string DisplayName = ""
 );
 
 public sealed record DockerContainerStats(
